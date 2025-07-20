@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Image } from 'react-native';
+import { View, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { TextInput, Button, Card, Text, Provider as PaperProvider } from 'react-native-paper';
 import { supabase } from '../lib/supabase';
 
@@ -44,79 +44,87 @@ export default function SignInScreen({ onSignInSuccess }) {
 
   return (
     <PaperProvider>
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: BG_GREEN }}>
-        <Card style={{
-          width: '90%',
-          maxWidth: 400,
-          padding: 20,
-          borderRadius: 20,
-          elevation: 4,
-          backgroundColor: 'white',
-          shadowColor: '#000',
-        }}>
-          <View style={{ alignItems: 'center', marginBottom: 12 }}>
-            <Image
-              source={require('../assets/poco-logo.png')}
-              style={{ width: 100, height: 100, resizeMode: 'contain', marginBottom: 8 }}
-            />
-            <Text style={{
-              color: DARK_GREEN,
-              fontWeight: 'bold',
-              fontSize: 28,
-              textAlign: 'center',
-              letterSpacing: 2,
-              marginBottom: 4
-            }}>
-              Pocket Companion
-            </Text>
-          </View>
-          <Card.Content>
-            <Text style={{ textAlign: 'center', marginBottom: 16, color: '#333', fontSize: 16 }}>
-              Sign in to your account
-            </Text>
-            <TextInput
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              style={{ marginBottom: 12, backgroundColor: 'white' }}
-            />
-            <TextInput
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              style={{ marginBottom: 20, backgroundColor: 'white' }}
-            />
-            <Button
-              mode="contained"
-              onPress={handleSignIn}
-              style={{ marginBottom: 10, backgroundColor: LIGHT_GREEN }}
-              labelStyle={{ fontWeight: 'bold', color: '#00332e' }}
-            >
-              Sign In
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handleSignUp}
-              style={{ backgroundColor: DARK_GREEN }}
-              labelStyle={{ fontWeight: 'bold', color: 'white' }}
-            >
-              Sign Up
-            </Button>
-            {message ? (
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: BG_GREEN }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={60}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Card style={{
+            width: '90%',
+            maxWidth: 400,
+            padding: 20,
+            borderRadius: 20,
+            elevation: 8,
+            backgroundColor: 'white',
+            shadowColor: '#000',
+            borderWidth: 2,
+            borderColor: DARK_GREEN,
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Image
+                source={require('../assets/poco-logo.png')}
+                style={{ width: 100, height: 100, resizeMode: 'contain', marginBottom: 8 }}
+              />
               <Text style={{
-                marginTop: 16,
-                color: getMessageColor(),
-                textAlign: 'center'
+                color: DARK_GREEN,
+                fontWeight: 'bold',
+                fontSize: 28,
+                textAlign: 'center',
+                letterSpacing: 2,
+                marginBottom: 4
               }}>
-                {message}
+                Pocket Companion
               </Text>
-            ) : null}
-          </Card.Content>
-        </Card>
-      </View>
+            </View>
+            <Card.Content>
+              <Text style={{ textAlign: 'center', marginBottom: 16, color: '#333', fontSize: 16 }}>
+                Sign in to your account
+              </Text>
+              <TextInput
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                style={{ marginBottom: 12, backgroundColor: 'white' }}
+              />
+              <TextInput
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                style={{ marginBottom: 20, backgroundColor: 'white' }}
+              />
+              <Button
+                mode="contained"
+                onPress={handleSignIn}
+                style={{ marginBottom: 10, backgroundColor: LIGHT_GREEN }}
+                labelStyle={{ fontWeight: 'bold', color: '#00332e' }}
+              >
+                Sign In
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleSignUp}
+                style={{ backgroundColor: DARK_GREEN }}
+                labelStyle={{ fontWeight: 'bold', color: 'white' }}
+              >
+                Sign Up
+              </Button>
+              {message ? (
+                <Text style={{
+                  marginTop: 16,
+                  color: getMessageColor(),
+                  textAlign: 'center'
+                }}>
+                  {message}
+                </Text>
+              ) : null}
+            </Card.Content>
+          </Card>
+        </View>
+      </KeyboardAvoidingView>
     </PaperProvider>
   );
 }
