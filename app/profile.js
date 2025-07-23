@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { router } from 'expo-router';
+import { aiService } from '../lib/aiService';
 
 export default function ProfileScreen() {
   console.log('Profile screen loaded - version 3.0'); // Test log
@@ -317,6 +318,47 @@ export default function ProfileScreen() {
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>About</Text>
                   <Text style={styles.settingSubtitle}>App version and information</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Memory Management */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Memory & Data</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity 
+              style={styles.settingItem} 
+              onPress={() => {
+                Alert.alert(
+                  'Clear Memory',
+                  'This will delete all conversation history and reset your AI companion\'s memory. This action cannot be undone.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Clear Memory',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await aiService.clearMemory(user.id);
+                          Alert.alert('Success', 'Memory cleared successfully. Your AI companion will start fresh.');
+                        } catch (error) {
+                          console.error('Error clearing memory:', error);
+                          Alert.alert('Error', 'Failed to clear memory. Please try again.');
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <View style={styles.settingLeft}>
+                <Ionicons name="trash" size={24} color="#dc2626" style={styles.settingIcon} />
+                <View style={styles.settingText}>
+                  <Text style={[styles.settingTitle, { color: '#dc2626' }]}>Clear Memory</Text>
+                  <Text style={styles.settingSubtitle}>Delete conversation history</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
