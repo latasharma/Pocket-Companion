@@ -1,27 +1,78 @@
 import * as React from 'react';
-import { View, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Image, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { TextInput, Button, Card, Text, Provider as PaperProvider } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 
 const DARK_GREEN = '#00B686';
 const LIGHT_GREEN = '#1DE9B6';
 const BG_GREEN = '#f0fdf4';
 
-export default function SignInScreen({ onSignInSuccess }) {
+export default function SignInScreen() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [message, setMessage] = React.useState('');
+  const [rememberMe, setRememberMe] = React.useState(false);
+  const router = useRouter();
+
+  // Load saved email on component mount
+  React.useEffect(() => {
+    const loadSavedEmail = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem('rememberedEmail');
+        if (savedEmail) {
+          setEmail(savedEmail);
+          setRememberMe(true);
+        }
+      } catch (error) {
+        console.log('Error loading saved email:', error);
+      }
+    };
+    loadSavedEmail();
+  }, []);
 
   const handleSignIn = async () => {
     if (!email || !password) {
       setMessage('Please enter both email and password.');
       return;
     }
+    
+    // Save email if remember me is checked
+    if (rememberMe) {
+      try {
+        await AsyncStorage.setItem('rememberedEmail', email);
+      } catch (error) {
+        console.log('Error saving email:', error);
+      }
+    } else {
+      try {
+        await AsyncStorage.removeItem('rememberedEmail');
+      } catch (error) {
+        console.log('Error removing saved email:', error);
+      }
+    }
+    
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setMessage(error.message);
     else {
       setMessage('Signed in!');
-      if (onSignInSuccess) onSignInSuccess();
+      // Check if user is onboarded and navigate accordingly
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name, companion_name')
+          .eq('id', user.id);
+        
+        const isOnboarded = !!(profile && profile.length > 0 && profile[0].first_name && profile[0].companion_name);
+        
+        if (isOnboarded) {
+          router.replace('/');
+        } else {
+          router.replace('/onboarding');
+        }
+      }
     }
   };
 
@@ -32,7 +83,13 @@ export default function SignInScreen({ onSignInSuccess }) {
     }
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) setMessage(error.message);
-    else setMessage('Check your email for the confirmation link!');
+    else {
+      setMessage('Check your email for the confirmation link!');
+      // After sign up, user will need to complete onboarding
+      setTimeout(() => {
+        router.replace('/onboarding');
+      }, 2000);
+    }
   };
 
   const getMessageColor = () => {
@@ -94,8 +151,38 @@ export default function SignInScreen({ onSignInSuccess }) {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                style={{ marginBottom: 20, backgroundColor: 'white' }}
+                style={{ marginBottom: 12, backgroundColor: 'white' }}
               />
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setRememberMe(!rememberMe)}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderWidth: 2,
+                    borderColor: DARK_GREEN,
+                    borderRadius: 4,
+                    marginRight: 8,
+                    backgroundColor: rememberMe ? DARK_GREEN : '#fff',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  {rememberMe && (
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        backgroundColor: '#fff',
+                        borderRadius: 2,
+                      }}
+                    />
+                  )}
+                </TouchableOpacity>
+                <Text style={{ color: '#333', fontSize: 14 }}>
+                  Remember my email
+                </Text>
+              </View>
               <Button
                 mode="contained"
                 onPress={handleSignIn}

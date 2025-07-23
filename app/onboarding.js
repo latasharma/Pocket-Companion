@@ -2,61 +2,100 @@ import * as React from 'react';
 import { View, Image, TouchableOpacity, Platform, KeyboardAvoidingView } from 'react-native';
 import { TextInput, Button, Card, Text, Provider as PaperProvider } from 'react-native-paper';
 import { supabase } from '../lib/supabase';
+import { useRouter } from 'expo-router';
 
 const SUGGESTED_NAMES = ['Echo', 'Nova', 'Aura', 'Pixel'];
 
-export default function OnboardingScreen({ navigation }) {
+export default function OnboardingScreen() {
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
   const [companionName, setCompanionName] = React.useState('');
   const [accepted, setAccepted] = React.useState(false);
   const [message, setMessage] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const router = useRouter();
+
+  // Skip onboarding if already completed
+  React.useEffect(() => {
+    const checkProfile = async () => {
+      const userResult = await supabase.auth.getUser();
+      if (!userResult || userResult.error || !userResult.data || !userResult.data.user) return;
+      const user = userResult.data.user;
+      const { data } = await supabase
+        .from('profiles')
+        .select('first_name, companion_name')
+        .eq('id', user.id);
+      
+      if (data && data.length > 0 && data[0].first_name && data[0].companion_name) {
+        router.replace('/');
+      }
+    };
+    checkProfile();
+  }, []);
 
   const handleContinue = async () => {
-    alert('Accepted value: ' + accepted);
+    setMessage('');
+    if (!firstName.trim()) {
+      setMessage('Please enter your first name.');
+      return;
+    }
+    if (!lastName.trim()) {
+      setMessage('Please enter your last name.');
+      return;
+    }
     if (!accepted) {
       setMessage('You must accept the privacy policy and terms.');
-      alert('Policy not accepted');
       return;
     }
+    if (!companionName.trim()) {
+      setMessage('Please enter a name for your companion.');
+      return;
+	console.log('Saving companion name:', companionName);
+	console.log('User ID:', user.id);
+	console.log('About to upsert profile...');
 
-    console.log('Before getUser');
+    }
+
+    setIsLoading(true);
+
     const userResult = await supabase.auth.getUser();
-    console.log('After getUser');
-    console.log('userResult:', userResult);
-
     if (!userResult || userResult.error || !userResult.data || !userResult.data.user) {
       setMessage('User not found. Please sign in again.');
-      alert('User not found. Please sign in again.');
+      setIsLoading(false);
+      return;
+    }
+    const user = userResult.data.user;
+
+    // Save user info to Supabase
+    console.log('About to upsert profile with ID:', user.id, 'first_name:', firstName, 'last_name:', lastName, 'companion_name:', companionName);
+    
+    // Use upsert to handle both insert and update
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert({ 
+        id: user.id, 
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        companion_name: companionName 
+      }, {
+        onConflict: 'id'
+      })
+      .select();
+    
+    console.log('Upsert result:', data);
+    console.log('Upsert error:', error);
+
+    if (error) {
+console.log('Final error:', error);
+      setMessage('Failed to save companion name.');
+      setIsLoading(false);
       return;
     }
 
-const user = userResult.data.user;
-alert('User found: ' + user.id);
-console.log('User found:', user.id);
-
-// Save companion name to Supabase
-// Try insert first
-let { error } = await supabase
-  .from('profiles')
-  .insert([{ id: user.id, companion_name: companionName }]);
-
-if (error && error.code === '23505') { // duplicate key, row exists
-  // Try update
-  ({ error } = await supabase
-    .from('profiles')
-    .update({ companion_name: companionName })
-    .eq('id', user.id));
-}
-
-if (error) {
-  setMessage('Failed to save companion name.');
-  alert('Upsert error: ' + JSON.stringify(error));
-  return;
-}
-
-setMessage('Onboarding complete!');
-alert('Onboarding complete!');
-
-    // navigation.replace('Home'); // Add navigation logic as needed
+    setMessage('');
+    setIsLoading(false);
+    router.replace('/');
   };
 
   return (
@@ -66,8 +105,8 @@ alert('Onboarding complete!');
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={150}
       >
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Image
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Image 
             source={require('../assets/poco-logo.png')}
             style={{ width: 80, height: 80, resizeMode: 'contain', marginBottom: 16 }}
           />
@@ -75,7 +114,7 @@ alert('Onboarding complete!');
             color: '#00B686',
             fontWeight: 'bold',
             fontSize: 26,
-            letterSpacing: 1,
+            letterSpacing: 1,   
             textAlign: 'center',
             marginBottom: 8,
           }}>
@@ -89,7 +128,7 @@ alert('Onboarding complete!');
             textAlign: 'center',
             width: '80%',
           }}>
-            Give your new friend a name
+            Let's get to know each other
           </Text>
           <Card style={{
             width: '90%',
@@ -104,25 +143,56 @@ alert('Onboarding complete!');
           }}>
             <Card.Content>
               <TextInput
+                label="First Name"
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="Enter your first name"
+                placeholderTextColor="#a3a3a3"
+                style={{ marginBottom: 12, backgroundColor: 'white' }}
+                autoCapitalize="words"
+                mode="outlined"
+              />
+              <TextInput
+                label="Last Name"
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Enter your last name"
+                placeholderTextColor="#a3a3a3"
+                style={{ marginBottom: 12, backgroundColor: 'white' }}
+                autoCapitalize="words"
+                mode="outlined"
+              />
+              <Text style={{ 
+                color: '#00B686', 
+                fontWeight: 'bold', 
+                fontSize: 16, 
+                marginBottom: 12,
+                textAlign: 'center'
+              }}>
+                Now name your companion
+              </Text>
+              <TextInput
                 label="Companion Name"
                 value={companionName}
                 onChangeText={setCompanionName}
                 placeholder="e.g. PoCo"
                 placeholderTextColor="#a3a3a3"
                 style={{ marginBottom: 4, backgroundColor: 'white' }}
-              />
+                autoCapitalize="words"
+                mode="outlined"
+              /> 
               <View style={{ flexDirection: 'row', marginBottom: 8, flexWrap: 'wrap' }}>
                 {SUGGESTED_NAMES.map((name) => (
                   <TouchableOpacity
                     key={name}
                     onPress={() => setCompanionName(name)}
-                    style={{
+                    style={{   
                       backgroundColor: '#f0fdf4',
                       borderColor: '#00B686',
                       borderWidth: 1,
                       borderRadius: 16,
                       paddingVertical: 4,
-                      paddingHorizontal: 12,
+                      paddingHorizontal: 12, 
                       marginRight: 8,
                       marginBottom: 4,
                     }}
@@ -144,45 +214,52 @@ alert('Onboarding complete!');
                     borderColor: '#00B686',
                     borderRadius: 6,
                     marginRight: 8,
-                    alignItems: 'center',
+                    backgroundColor: accepted ? '#00B686' : '#fff',
                     justifyContent: 'center',
-                    backgroundColor: accepted ? '#00B686' : 'white',
+                    alignItems: 'center',
                   }}
                 >
-                  {accepted ? (
-                    <View style={{
-                      width: 12,
-                      height: 12,
-                      backgroundColor: 'white',
-                      borderRadius: 2,
-                    }} />
-                  ) : null}
+                  {accepted && (
+                    <View
+                      style={{
+                        width: 12,
+                        height: 12,
+                        backgroundColor: '#fff',
+                        borderRadius: 3,
+                      }}
+                    />
+                  )}
                 </TouchableOpacity>
-                <Text onPress={() => setAccepted(!accepted)}>
-                  I accept the <Text style={{ color: '#00B686', textDecorationLine: 'underline' }}>Privacy Policy</Text> and <Text style={{ color: '#00B686', textDecorationLine: 'underline' }}>Terms of Service</Text>
+                <Text>
+                  I accept the{' '}
+                  <Text style={{ color: '#00B686', textDecorationLine: 'underline' }}>
+                    Privacy Policy
+                  </Text>
                 </Text>
               </View>
+              {message ? (
+                <Text style={{ color: 'red', marginBottom: 8 }}>{message}</Text>
+              ) : null}
               <Button
                 mode="contained"
                 onPress={handleContinue}
-                style={{ backgroundColor: '#00B686' }}
-                labelStyle={{ fontWeight: 'bold', color: 'white' }}
+                loading={isLoading}
+                disabled={isLoading}
+                style={{
+                  backgroundColor: '#00B686',
+                  borderRadius: 8,
+                  marginTop: 8,
+                }}
+                contentStyle={{ paddingVertical: 8 }}
+                labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}
               >
                 Continue
               </Button>
-              {message ? (
-                <Text style={{
-                  marginTop: 16,
-                  color: message.includes('accept') ? 'red' : '#00B686',
-                  textAlign: 'center'
-                }}>
-                  {message}
-                </Text>
-              ) : null}
             </Card.Content>
           </Card>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoidingView>  
     </PaperProvider>
   );
 }
+
