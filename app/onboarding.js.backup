@@ -203,39 +203,6 @@ console.log('Final error:', error);
               </View>
               <Text style={{ color: '#888', fontSize: 12, marginBottom: 16 }}>
                 You can change this later in the settings.
-
-              {/* Disclaimer - Made More Prominent */}
-              <View style={{
-                backgroundColor: "#fff3cd",
-                borderColor: "#ffeaa7",
-                borderWidth: 2,
-                borderRadius: 8,
-                padding: 16,
-                marginBottom: 16,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                elevation: 3,
-              }}>
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: "bold",
-                  color: "#856404",
-                  marginBottom: 8,
-                  textAlign: "center",
-                }}>
-                  ⚠️ IMPORTANT DISCLAIMER
-                </Text>
-                <Text style={{
-                  fontSize: 13,
-                  color: "#856404",
-                  lineHeight: 18,
-                  textAlign: "center",
-                }}>
-                  This AI companion is for entertainment and general assistance purposes only. We are not responsible for any decisions made based on AI responses. The AI does not provide medical, legal, financial, or professional advice. Always consult qualified professionals for serious matters. Use this app at your own discretion.
-                </Text>
-              </View>
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                 <TouchableOpacity

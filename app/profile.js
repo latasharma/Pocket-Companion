@@ -121,7 +121,7 @@ export default function ProfileScreen() {
   };
 
   const openSupport = () => {
-    Alert.alert('Contact Support', 'Email us at: support@aipocketcompanion.com\n\nWe typically respond within 24 hours.');
+    Alert.alert('Contact Support', 'Email us at: lata@hellopoco.app\n\nWe typically respond within 24 hours.');
   };
 
   const openFAQ = () => {
