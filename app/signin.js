@@ -85,16 +85,10 @@ export default function SignInScreen() {
     setMessage('Creating your account...');
     
     try {
-      // For development, let's try without email confirmation
+      // Simple signup without email confirmation
       const { data, error } = await supabase.auth.signUp({ 
         email, 
-        password,
-        options: {
-          emailRedirectTo: 'http://localhost:8081', // Match your Expo server URL
-          data: {
-            // Add any additional user metadata here
-          }
-        }
+        password
       });
       
       console.log('Signup result:', data);
@@ -104,34 +98,17 @@ export default function SignInScreen() {
         setMessage(error.message);
       } else if (data.user) {
         console.log('User created successfully:', data.user.id);
-        setMessage('Account created successfully! Establishing session...');
         
-        // For development, let's try to sign in immediately
-        setTimeout(async () => {
-          try {
-            // Try to sign in with the same credentials
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email,
-              password
-            });
-            
-            console.log('Sign in result:', signInData);
-            console.log('Sign in error:', signInError);
-            
-            if (signInError) {
-              console.log('Sign in failed, redirecting to signin');
-              setMessage('Please sign in manually to continue.');
-              router.replace('/signin');
-            } else {
-              console.log('Sign in successful, redirecting to onboarding');
-              router.replace('/onboarding');
-            }
-          } catch (sessionError) {
-            console.error('Session error:', sessionError);
-            setMessage('Session error. Please sign in manually.');
-            router.replace('/signin');
-          }
-        }, 1000);
+        // Check if email confirmation is required
+        if (data.user.email_confirmed_at) {
+          // Email already confirmed, proceed to onboarding
+          setMessage('Account created! Redirecting to onboarding...');
+          router.replace('/onboarding');
+        } else {
+          // Email confirmation required
+          setMessage('Please check your email and click the confirmation link, then sign in.');
+          // Don't redirect - let user confirm email first
+        }
       } else {
         setMessage('Account creation failed. Please try again.');
       }
