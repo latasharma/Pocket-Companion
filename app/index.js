@@ -99,25 +99,6 @@ export default function HomeScreen() {
           How can I help you today?
         </Text>
 
-        {/* Disclaimer */}
-        <View style={{
-          backgroundColor: '#f8f9fa',
-          borderColor: '#e5e7eb',
-          borderWidth: 1,
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 24,
-        }}>
-          <Text style={{
-            fontSize: 12,
-            color: '#6b7280',
-            textAlign: 'center',
-            lineHeight: 16,
-          }}>
-            AI companion for general assistance. For professional advice, consult qualified experts.
-          </Text>
-        </View>
-
         <Link href="/chat" asChild>
           <Button
             mode="contained"
@@ -144,6 +125,25 @@ export default function HomeScreen() {
         >
           Sign Out
         </Button>
+
+        {/* Disclaimer - Moved below sign out */}
+        <View style={{
+          backgroundColor: '#f8f9fa',
+          borderColor: '#e5e7eb',
+          borderWidth: 1,
+          borderRadius: 8,
+          padding: 12,
+          marginTop: 16,
+        }}>
+          <Text style={{
+            fontSize: 11,
+            color: '#9ca3af',
+            textAlign: 'center',
+            lineHeight: 14,
+          }}>
+            ⭐ AI companion for general assistance. For professional advice, consult qualified experts.
+          </Text>
+        </View>
       </View>
     </PaperProvider>
   );
