@@ -90,6 +90,7 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
+    console.log('Sign out button pressed'); // Debug log
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
@@ -99,8 +100,11 @@ export default function ProfileScreen() {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
+            console.log('User confirmed sign out'); // Debug log
             try {
+              console.log('Calling supabase.auth.signOut()'); // Debug log
               await supabase.auth.signOut();
+              console.log('Sign out successful, navigating to signin'); // Debug log
               router.replace('/signin');
             } catch (error) {
               console.error('Error signing out:', error);

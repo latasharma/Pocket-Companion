@@ -207,31 +207,32 @@ console.log('Final error:', error);
               {/* Disclaimer - Made More Prominent */}
               <View style={{
                 backgroundColor: "#fff3cd",
-                borderColor: "#ffeaa7",
-                borderWidth: 2,
+                borderColor: "#dc2626",
+                borderWidth: 3,
                 borderRadius: 8,
-                padding: 16,
+                padding: 20,
                 marginBottom: 16,
                 shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                elevation: 3,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 5,
               }}>
                 <Text style={{
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: "bold",
-                  color: "#856404",
-                  marginBottom: 8,
+                  color: "#dc2626",
+                  marginBottom: 10,
                   textAlign: "center",
                 }}>
-                  ⚠️ IMPORTANT DISCLAIMER
+                  ⚠️ IMPORTANT DISCLAIMER ⚠️
                 </Text>
                 <Text style={{
-                  fontSize: 13,
-                  color: "#856404",
-                  lineHeight: 18,
+                  fontSize: 14,
+                  color: "#dc2626",
+                  lineHeight: 20,
                   textAlign: "center",
+                  fontWeight: "500",
                 }}>
                   This AI companion is for entertainment and general assistance purposes only. We are not responsible for any decisions made based on AI responses. The AI does not provide medical, legal, financial, or professional advice. Always consult qualified professionals for serious matters. Use this app at your own discretion.
                 </Text>

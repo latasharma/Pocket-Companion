@@ -219,37 +219,14 @@ export default function ChatScreen() {
   return (
     <PaperProvider>
       <View style={{ flex: 1, backgroundColor: '#f0fdf4' }}>
-        {/* Clean Header - Single Navigation */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingTop: 50,
-          paddingBottom: 16,
-          backgroundColor: 'white',
-          borderBottomWidth: 1,
-          borderBottomColor: '#e5e7eb',
-        }}>
-          <IconButton
-            icon="arrow-left"
-            size={24}
-            onPress={handleBackPress}
-            iconColor="#00B686"
-          />
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#333' }}>
-              {companionName}
-            </Text>
-            <Text style={{ fontSize: 14, color: '#666' }}>
-              AI Pocket Companion
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Chat with {companionName}</Text>
+          <View style={styles.disclaimerContainer}>
+            <Text style={styles.disclaimerText}>
+              ⚠️ For entertainment and general assistance only. Not a replacement for professional advice. ⚠️
             </Text>
           </View>
-          <IconButton
-            icon="dots-vertical"
-            size={24}
-            onPress={() => {/* TODO: Add chat settings */}}
-            iconColor="#666"
-          />
         </View>
 
         {/* Messages */}
