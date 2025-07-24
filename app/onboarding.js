@@ -26,11 +26,19 @@ export default function OnboardingScreen() {
       const user = userResult.data.user;
       const { data } = await supabase
         .from('profiles')
-        .select('first_name, companion_name')
+        .select('first_name, companion_name, communication_mode')
         .eq('id', user.id);
       
-      if (data && data.length > 0 && data[0].first_name && data[0].companion_name) {
+      // Only skip if user has completed full onboarding (including communication mode)
+      if (data && data.length > 0 && data[0].first_name && data[0].companion_name && data[0].communication_mode) {
         router.replace('/');
+      } else if (data && data.length > 0 && data[0].first_name && data[0].companion_name) {
+        // User has basic info but not communication mode - load existing data
+        setFirstName(data[0].first_name || '');
+        setLastName(data[0].last_name || '');
+        setCompanionName(data[0].companion_name || '');
+        setCommunicationMode(data[0].communication_mode || 'text');
+        setSelectedAccent(data[0].accent || 'American');
       }
     };
     checkProfile();

@@ -286,6 +286,51 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Communication Preferences */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Communication Preferences</Text>
+          <View style={styles.settingsCard}>
+            <View style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="chatbubbles" size={24} color="#00B686" style={styles.settingIcon} />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Chat Mode</Text>
+                  <Text style={styles.settingSubtitle}>
+                    {user.communication_mode === 'voice' ? 'Voice Mode' : 'Text Mode'}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert(
+                    'Update Communication Mode',
+                    'To change your communication preferences, please complete onboarding again.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Go to Onboarding', onPress: () => router.push('/onboarding') }
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+            
+            {user.communication_mode === 'voice' && (
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="mic" size={24} color="#00B686" style={styles.settingIcon} />
+                  <View style={styles.settingText}>
+                    <Text style={styles.settingTitle}>Voice Accent</Text>
+                    <Text style={styles.settingSubtitle}>{user.accent || 'American'}</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Help & Support */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Help & Support</Text>
