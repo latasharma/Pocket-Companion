@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Image, TouchableOpacity, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Image, TouchableOpacity, Platform, KeyboardAvoidingView, Alert } from 'react-native';
 import { TextInput, Button, Card, Text, Provider as PaperProvider } from 'react-native-paper';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'expo-router';
@@ -169,23 +169,22 @@ console.log('Final error:', error);
                 marginBottom: 12,
                 textAlign: 'center'
               }}>
-                How would you like to communicate?
+                How would you like to chat?
               </Text>
               
-              {/* Communication Mode Selection */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
-                  Communication Mode:
-                </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+              {/* Communication Mode Selection - Simplified */}
+              <View style={{ marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 }}>
                   <TouchableOpacity
                     style={{
                       backgroundColor: communicationMode === 'text' ? '#00B686' : '#f3f4f6',
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 8,
-                      borderWidth: 1,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      borderRadius: 12,
+                      borderWidth: 2,
                       borderColor: communicationMode === 'text' ? '#00B686' : '#d1d5db',
+                      flex: 1,
+                      marginRight: 8,
                     }}
                     onPress={() => setCommunicationMode('text')}
                   >
@@ -193,19 +192,30 @@ console.log('Final error:', error);
                       color: communicationMode === 'text' ? 'white' : '#374151',
                       fontWeight: '600',
                       textAlign: 'center',
+                      fontSize: 16,
                     }}>
-                      📝 Text Only
+                      📝 Text
+                    </Text>
+                    <Text style={{
+                      color: communicationMode === 'text' ? 'rgba(255,255,255,0.8)' : '#6b7280',
+                      textAlign: 'center',
+                      fontSize: 12,
+                      marginTop: 4,
+                    }}>
+                      Type messages
                     </Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
                     style={{
                       backgroundColor: communicationMode === 'voice' ? '#00B686' : '#f3f4f6',
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 8,
-                      borderWidth: 1,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      borderRadius: 12,
+                      borderWidth: 2,
                       borderColor: communicationMode === 'voice' ? '#00B686' : '#d1d5db',
+                      flex: 1,
+                      marginLeft: 8,
                     }}
                     onPress={() => setCommunicationMode('voice')}
                   >
@@ -213,68 +223,113 @@ console.log('Final error:', error);
                       color: communicationMode === 'voice' ? 'white' : '#374151',
                       fontWeight: '600',
                       textAlign: 'center',
+                      fontSize: 16,
                     }}>
-                      🎤 Voice Only
+                      🎤 Voice
+                    </Text>
+                    <Text style={{
+                      color: communicationMode === 'voice' ? 'rgba(255,255,255,0.8)' : '#6b7280',
+                      textAlign: 'center',
+                      fontSize: 12,
+                      marginTop: 4,
+                    }}>
+                      Speak naturally
                     </Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: communicationMode === 'hybrid' ? '#00B686' : '#f3f4f6',
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: communicationMode === 'hybrid' ? '#00B686' : '#d1d5db',
-                    }}
-                    onPress={() => setCommunicationMode('hybrid')}
-                  >
+                </View>
+
+                {/* Voice Demo Section */}
+                {communicationMode === 'voice' && (
+                  <View style={{
+                    backgroundColor: '#f0fdf4',
+                    borderColor: '#00B686',
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    padding: 16,
+                    marginBottom: 16,
+                  }}>
                     <Text style={{
-                      color: communicationMode === 'hybrid' ? 'white' : '#374151',
+                      fontSize: 14,
                       fontWeight: '600',
+                      color: '#00B686',
+                      marginBottom: 8,
                       textAlign: 'center',
                     }}>
-                      🔄 Hybrid
+                      🎧 Try Voice Mode
                     </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Accent Selection (if voice is selected) */}
-              {(communicationMode === 'voice' || communicationMode === 'hybrid') && (
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
-                    Preferred Accent:
-                  </Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around' }}>
-                    {['American', 'British', 'Indian', 'Australian', 'Canadian'].map((accent) => (
-                      <TouchableOpacity
-                        key={accent}
-                        style={{
-                          backgroundColor: selectedAccent === accent ? '#00B686' : '#f3f4f6',
-                          paddingVertical: 8,
-                          paddingHorizontal: 12,
-                          borderRadius: 6,
-                          borderWidth: 1,
-                          borderColor: selectedAccent === accent ? '#00B686' : '#d1d5db',
-                          marginBottom: 8,
-                          minWidth: 80,
-                        }}
-                        onPress={() => setSelectedAccent(accent)}
-                      >
-                        <Text style={{
-                          color: selectedAccent === accent ? 'white' : '#374151',
-                          fontWeight: '500',
-                          textAlign: 'center',
-                          fontSize: 12,
-                        }}>
-                          {accent}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                    <Text style={{
+                      fontSize: 12,
+                      color: '#6b7280',
+                      textAlign: 'center',
+                      lineHeight: 16,
+                      marginBottom: 12,
+                    }}>
+                      Tap to hear how {companionName} will sound
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#00B686',
+                        paddingVertical: 8,
+                        paddingHorizontal: 16,
+                        borderRadius: 6,
+                        alignSelf: 'center',
+                      }}
+                      onPress={() => {
+                        // Demo voice functionality
+                        Alert.alert(
+                          'Voice Demo',
+                          `Hi ${firstName}! I'm ${companionName}, your voice companion. I can speak with different accents to match your preference.`,
+                          [{ text: 'OK' }]
+                        );
+                      }}
+                    >
+                      <Text style={{
+                        color: 'white',
+                        fontWeight: '600',
+                        fontSize: 12,
+                      }}>
+                        🔊 Hear Demo
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
-              )}
+                )}
+
+                {/* Accent Selection (only for voice) */}
+                {communicationMode === 'voice' && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 14, color: '#374151', marginBottom: 8, textAlign: 'center' }}>
+                      Choose your preferred accent:
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {['American', 'British', 'Indian', 'Australian', 'Canadian'].map((accent) => (
+                        <TouchableOpacity
+                          key={accent}
+                          style={{
+                            backgroundColor: selectedAccent === accent ? '#00B686' : '#f3f4f6',
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: selectedAccent === accent ? '#00B686' : '#d1d5db',
+                            margin: 4,
+                            minWidth: 80,
+                          }}
+                          onPress={() => setSelectedAccent(accent)}
+                        >
+                          <Text style={{
+                            color: selectedAccent === accent ? 'white' : '#374151',
+                            fontWeight: '500',
+                            textAlign: 'center',
+                            fontSize: 12,
+                          }}>
+                            {accent}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
 
               <Text style={{ 
                 color: '#00B686', 

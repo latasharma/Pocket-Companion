@@ -352,7 +352,7 @@ export default function ChatScreen() {
               </View>
               
               {/* Voice Input Button (if voice mode is enabled) */}
-              {(communicationMode === 'voice' || communicationMode === 'hybrid') && (
+              {communicationMode === 'voice' && (
                 <TouchableOpacity
                   onPress={handleVoiceInput}
                   style={{
