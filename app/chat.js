@@ -43,8 +43,10 @@ export default function ChatScreen() {
 
         if (data && data.length > 0) {
           const profile = data[0];
+          console.log('Profile data:', profile); // Debug log
           setUserName(profile.first_name || '');
           setCompanionName(profile.companion_name || 'Pixel');
+          console.log('Setting companion name to:', profile.companion_name || 'Pixel'); // Debug log
           setCommunicationMode(profile.communication_mode || 'text');
           setAccent(profile.accent || 'American');
           
