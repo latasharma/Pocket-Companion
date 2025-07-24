@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { AIService } from '../lib/aiService';
-import { voiceService } from '../lib/voiceService';
 
 export default function ChatScreen() {
   const [messages, setMessages] = React.useState([
@@ -20,9 +19,6 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [userName, setUserName] = React.useState('');
   const [companionName, setCompanionName] = React.useState('');
-  const [communicationMode, setCommunicationMode] = React.useState('text');
-  const [accent, setAccent] = React.useState('American');
-  const [isListening, setIsListening] = React.useState(false);
   const scrollViewRef = React.useRef();
   const router = useRouter();
 
@@ -38,19 +34,16 @@ export default function ChatScreen() {
         // Get user profile
         const { data } = await supabase
           .from('profiles')
-          .select('first_name, companion_name, communication_mode, accent')
+          .select('first_name, companion_name')
           .eq('id', user.id);
 
         if (data && data.length > 0) {
           const profile = data[0];
           console.log('Profile data:', profile); // Debug log
           console.log('Companion name from DB:', profile.companion_name); // Debug log
-          console.log('Communication mode from DB:', profile.communication_mode); // Debug log
           setUserName(profile.first_name || '');
           setCompanionName(profile.companion_name || 'Pixel');
           console.log('Setting companion name to:', profile.companion_name || 'Pixel'); // Debug log
-          setCommunicationMode(profile.communication_mode || 'text');
-          setAccent(profile.accent || 'American');
           
           // Get conversation history
           const conversationHistory = await AIService.getConversationHistory(user.id, 20);
@@ -73,27 +66,9 @@ export default function ChatScreen() {
               sender: 'companion',
               timestamp: new Date(),
             }]);
-            
-            // Speak the welcome message if voice mode is enabled
-            if (profile.communication_mode === 'voice') {
-              setTimeout(async () => {
-                try {
-                  await voiceService.speakText(welcomeMessage, profile.accent || 'American');
-                } catch (error) {
-                  console.log('Could not speak welcome message:', error);
-                }
-              }, 1000);
-            }
           }
         }
 
-        // Initialize voice service
-        try {
-          await voiceService.initializeVoice();
-        } catch (error) {
-          console.log('Voice service not available:', error);
-          // Continue without voice functionality
-        }
       } catch (error) {
         console.error('Error loading chat history:', error);
         // Show basic welcome message on error
@@ -112,45 +87,6 @@ export default function ChatScreen() {
   React.useEffect(() => {
     console.log('Companion name state changed to:', companionName);
   }, [companionName]);
-
-  // Voice input handlers
-  const handleVoiceInput = async () => {
-    if (communicationMode === 'text') {
-      Alert.alert('Voice Not Enabled', 'Please enable voice mode in your profile settings.');
-      return;
-    }
-
-    if (isListening) {
-      await voiceService.stopListening();
-      setIsListening(false);
-    } else {
-      try {
-        const success = await voiceService.startListening();
-        if (success) {
-          setIsListening(true);
-        } else {
-          setIsListening(false);
-        }
-      } catch (error) {
-        console.error('Voice input error:', error);
-        Alert.alert('Voice Input Error', 'Could not start voice input. Please try again.');
-        setIsListening(false);
-      }
-    }
-  };
-
-  const handleVoiceResult = (recognizedText) => {
-    if (recognizedText && recognizedText.trim()) {
-      setInputText(recognizedText.trim());
-      setIsListening(false);
-      // Automatically send the message if it's not empty
-      setTimeout(() => {
-        sendMessage();
-      }, 500);
-    } else {
-      setIsListening(false);
-    }
-  };
 
   const handleBackPress = () => {
     if (messages.length > 1) {
@@ -224,17 +160,6 @@ export default function ChatScreen() {
         timestamp: new Date(savedAiMessage.created_at),
       };
       setMessages(prev => [...prev, aiMessageUI]);
-
-      // Speak the AI response if voice mode is enabled
-      if (communicationMode === 'voice') {
-        setTimeout(async () => {
-          try {
-            await voiceService.speakText(aiResponse.content, accent);
-          } catch (error) {
-            console.log('Could not speak AI response:', error);
-          }
-        }, 500);
-      }
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -396,28 +321,6 @@ export default function ChatScreen() {
                   contentStyle={{ fontSize: 16 }}
                 />
               </View>
-              
-              {/* Voice Input Button (if voice mode is enabled) */}
-              {communicationMode === 'voice' && (
-                <TouchableOpacity
-                  onPress={handleVoiceInput}
-                  style={{
-                    backgroundColor: isListening ? '#dc2626' : '#00B686',
-                    borderRadius: 20,
-                    width: 40,
-                    height: 40,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginRight: 8,
-                  }}
-                >
-                  <Ionicons 
-                    name={isListening ? "mic" : "mic-outline"} 
-                    size={20} 
-                    color="white" 
-                  />
-                </TouchableOpacity>
-              )}
               
               <TouchableOpacity
                 onPress={sendMessage}
