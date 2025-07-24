@@ -13,6 +13,8 @@ export default function OnboardingScreen() {
   const [accepted, setAccepted] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
+  const [communicationMode, setCommunicationMode] = React.useState('text'); // 'text', 'voice', 'hybrid'
+  const [selectedAccent, setSelectedAccent] = React.useState('American'); // Default to American
 
   const router = useRouter();
 
@@ -51,10 +53,6 @@ export default function OnboardingScreen() {
     if (!companionName.trim()) {
       setMessage('Please enter a name for your companion.');
       return;
-	console.log('Saving companion name:', companionName);
-	console.log('User ID:', user.id);
-	console.log('About to upsert profile...');
-
     }
 
     setIsLoading(true);
@@ -77,7 +75,9 @@ export default function OnboardingScreen() {
         id: user.id, 
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        companion_name: companionName 
+        companion_name: companionName,
+        communication_mode: communicationMode,
+        accent: selectedAccent
       }, {
         onConflict: 'id'
       })
@@ -162,6 +162,120 @@ console.log('Final error:', error);
                 autoCapitalize="words"
                 mode="outlined"
               />
+              <Text style={{ 
+                color: '#00B686', 
+                fontWeight: 'bold', 
+                fontSize: 16, 
+                marginBottom: 12,
+                textAlign: 'center'
+              }}>
+                How would you like to communicate?
+              </Text>
+              
+              {/* Communication Mode Selection */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
+                  Communication Mode:
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: communicationMode === 'text' ? '#00B686' : '#f3f4f6',
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: communicationMode === 'text' ? '#00B686' : '#d1d5db',
+                    }}
+                    onPress={() => setCommunicationMode('text')}
+                  >
+                    <Text style={{
+                      color: communicationMode === 'text' ? 'white' : '#374151',
+                      fontWeight: '600',
+                      textAlign: 'center',
+                    }}>
+                      📝 Text Only
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: communicationMode === 'voice' ? '#00B686' : '#f3f4f6',
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: communicationMode === 'voice' ? '#00B686' : '#d1d5db',
+                    }}
+                    onPress={() => setCommunicationMode('voice')}
+                  >
+                    <Text style={{
+                      color: communicationMode === 'voice' ? 'white' : '#374151',
+                      fontWeight: '600',
+                      textAlign: 'center',
+                    }}>
+                      🎤 Voice Only
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: communicationMode === 'hybrid' ? '#00B686' : '#f3f4f6',
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: communicationMode === 'hybrid' ? '#00B686' : '#d1d5db',
+                    }}
+                    onPress={() => setCommunicationMode('hybrid')}
+                  >
+                    <Text style={{
+                      color: communicationMode === 'hybrid' ? 'white' : '#374151',
+                      fontWeight: '600',
+                      textAlign: 'center',
+                    }}>
+                      🔄 Hybrid
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Accent Selection (if voice is selected) */}
+              {(communicationMode === 'voice' || communicationMode === 'hybrid') && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
+                    Preferred Accent:
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around' }}>
+                    {['American', 'British', 'Indian', 'Australian', 'Canadian'].map((accent) => (
+                      <TouchableOpacity
+                        key={accent}
+                        style={{
+                          backgroundColor: selectedAccent === accent ? '#00B686' : '#f3f4f6',
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderRadius: 6,
+                          borderWidth: 1,
+                          borderColor: selectedAccent === accent ? '#00B686' : '#d1d5db',
+                          marginBottom: 8,
+                          minWidth: 80,
+                        }}
+                        onPress={() => setSelectedAccent(accent)}
+                      >
+                        <Text style={{
+                          color: selectedAccent === accent ? 'white' : '#374151',
+                          fontWeight: '500',
+                          textAlign: 'center',
+                          fontSize: 12,
+                        }}>
+                          {accent}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               <Text style={{ 
                 color: '#00B686', 
                 fontWeight: 'bold', 

@@ -2,8 +2,10 @@ import * as React from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
 import { Text, TextInput, Button, Card, Provider as PaperProvider, IconButton } from 'react-native-paper';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { AIService } from '../lib/aiService';
+import { voiceService } from '../lib/voiceService';
 
 export default function ChatScreen() {
   const [messages, setMessages] = React.useState([
@@ -18,6 +20,9 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [userName, setUserName] = React.useState('');
   const [companionName, setCompanionName] = React.useState('');
+  const [communicationMode, setCommunicationMode] = React.useState('text');
+  const [accent, setAccent] = React.useState('American');
+  const [isListening, setIsListening] = React.useState(false);
   const scrollViewRef = React.useRef();
   const router = useRouter();
 
@@ -33,13 +38,15 @@ export default function ChatScreen() {
         // Get user profile
         const { data } = await supabase
           .from('profiles')
-          .select('first_name, companion_name')
+          .select('first_name, companion_name, communication_mode, accent')
           .eq('id', user.id);
 
         if (data && data.length > 0) {
           const profile = data[0];
           setUserName(profile.first_name || '');
           setCompanionName(profile.companion_name || 'Pixel');
+          setCommunicationMode(profile.communication_mode || 'text');
+          setAccent(profile.accent || 'American');
           
           // Get conversation history
           const conversationHistory = await AIService.getConversationHistory(user.id, 20);
@@ -63,6 +70,9 @@ export default function ChatScreen() {
             }]);
           }
         }
+
+        // Initialize voice service
+        await voiceService.initializeVoice();
       } catch (error) {
         console.error('Error loading chat history:', error);
         // Show basic welcome message on error
@@ -76,6 +86,29 @@ export default function ChatScreen() {
     };
     fetchUserInfoAndHistory();
   }, []);
+
+  // Voice input handlers
+  const handleVoiceInput = async () => {
+    if (communicationMode === 'text') {
+      Alert.alert('Voice Not Enabled', 'Please enable voice mode in your profile settings.');
+      return;
+    }
+
+    if (isListening) {
+      await voiceService.stopListening();
+      setIsListening(false);
+    } else {
+      const success = await voiceService.startListening();
+      if (success) {
+        setIsListening(true);
+      }
+    }
+  };
+
+  const handleVoiceResult = (recognizedText) => {
+    setInputText(recognizedText);
+    setIsListening(false);
+  };
 
   const handleBackPress = () => {
     if (messages.length > 1) {
@@ -310,6 +343,29 @@ export default function ChatScreen() {
                   contentStyle={{ fontSize: 16 }}
                 />
               </View>
+              
+              {/* Voice Input Button (if voice mode is enabled) */}
+              {(communicationMode === 'voice' || communicationMode === 'hybrid') && (
+                <TouchableOpacity
+                  onPress={handleVoiceInput}
+                  style={{
+                    backgroundColor: isListening ? '#dc2626' : '#00B686',
+                    borderRadius: 20,
+                    width: 40,
+                    height: 40,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginRight: 8,
+                  }}
+                >
+                  <Ionicons 
+                    name={isListening ? "mic" : "mic-outline"} 
+                    size={20} 
+                    color="white" 
+                  />
+                </TouchableOpacity>
+              )}
+              
               <TouchableOpacity
                 onPress={sendMessage}
                 disabled={!inputText.trim() || isLoading}
