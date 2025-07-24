@@ -84,22 +84,33 @@ export default function SignInScreen() {
     
     setMessage('Creating your account...');
     
-    const { data, error } = await supabase.auth.signUp({ 
-      email, 
-      password,
-      options: {
-        emailRedirectTo: 'exp://localhost:8081' // Use localhost for development
+    try {
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: 'exp://localhost:8081' // Use localhost for development
+        }
+      });
+      
+      console.log('Signup result:', data);
+      console.log('Signup error:', error);
+      
+      if (error) {
+        setMessage(error.message);
+      } else if (data.user) {
+        console.log('User created successfully:', data.user.id);
+        setMessage('Account created successfully! Redirecting to onboarding...');
+        // Temporarily bypass email confirmation for testing
+        setTimeout(() => {
+          router.replace('/onboarding');
+        }, 2000);
+      } else {
+        setMessage('Account creation failed. Please try again.');
       }
-    });
-    
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage('Account created successfully! Redirecting to onboarding...');
-      // Temporarily bypass email confirmation for testing
-      setTimeout(() => {
-        router.replace('/onboarding');
-      }, 2000);
+    } catch (error) {
+      console.error('Signup error:', error);
+      setMessage('An error occurred during signup. Please try again.');
     }
   };
 

@@ -22,24 +22,41 @@ export default function OnboardingScreen() {
   // Skip onboarding if already completed
   React.useEffect(() => {
     const checkProfile = async () => {
-      const userResult = await supabase.auth.getUser();
-      if (!userResult || userResult.error || !userResult.data || !userResult.data.user) return;
-      const user = userResult.data.user;
-      const { data } = await supabase
-        .from('profiles')
-        .select('first_name, companion_name, communication_mode')
-        .eq('id', user.id);
-      
-      // Only skip if user has completed full onboarding (including communication mode)
-      if (data && data.length > 0 && data[0].first_name && data[0].companion_name && data[0].communication_mode) {
-        router.replace('/');
-      } else if (data && data.length > 0 && data[0].first_name && data[0].companion_name) {
-        // User has basic info but not communication mode - load existing data
-        setFirstName(data[0].first_name || '');
-        setLastName(data[0].last_name || '');
-        setCompanionName(data[0].companion_name || '');
-        setCommunicationMode(data[0].communication_mode || 'text');
-        setSelectedAccent(data[0].accent || 'American');
+      try {
+        const userResult = await supabase.auth.getUser();
+        console.log('User result:', userResult);
+        
+        if (!userResult || userResult.error || !userResult.data || !userResult.data.user) {
+          console.log('No user found, redirecting to signin');
+          router.replace('/signin');
+          return;
+        }
+        
+        const user = userResult.data.user;
+        console.log('User found:', user.id);
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('first_name, companion_name, communication_mode')
+          .eq('id', user.id);
+        
+        console.log('Profile data:', data);
+        console.log('Profile error:', error);
+        
+        // Only skip if user has completed full onboarding (including communication mode)
+        if (data && data.length > 0 && data[0].first_name && data[0].companion_name && data[0].communication_mode) {
+          router.replace('/');
+        } else if (data && data.length > 0 && data[0].first_name && data[0].companion_name) {
+          // User has basic info but not communication mode - load existing data
+          setFirstName(data[0].first_name || '');
+          setLastName(data[0].last_name || '');
+          setCompanionName(data[0].companion_name || '');
+          setCommunicationMode(data[0].communication_mode || 'text');
+          setSelectedAccent(data[0].accent || 'American');
+        }
+      } catch (error) {
+        console.error('Error checking profile:', error);
+        router.replace('/signin');
       }
     };
     checkProfile();
@@ -66,45 +83,59 @@ export default function OnboardingScreen() {
 
     setIsLoading(true);
 
-    const userResult = await supabase.auth.getUser();
-    if (!userResult || userResult.error || !userResult.data || !userResult.data.user) {
-      setMessage('User not found. Please sign in again.');
+    try {
+      const userResult = await supabase.auth.getUser();
+      console.log('Continue - User result:', userResult);
+      
+      if (!userResult || userResult.error || !userResult.data || !userResult.data.user) {
+        console.log('No user found in handleContinue');
+        setMessage('User not found. Please sign in again.');
+        setIsLoading(false);
+        setTimeout(() => {
+          router.replace('/signin');
+        }, 2000);
+        return;
+      }
+      
+      const user = userResult.data.user;
+      console.log('Continue - User found:', user.id);
+
+      // Save user info to Supabase
+      console.log('About to upsert profile with ID:', user.id, 'first_name:', firstName, 'last_name:', lastName, 'companion_name:', companionName);
+      
+      // Use upsert to handle both insert and update
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({ 
+          id: user.id, 
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          companion_name: companionName,
+          communication_mode: communicationMode,
+          accent: selectedAccent
+        }, {
+          onConflict: 'id'
+        })
+        .select();
+      
+      console.log('Upsert result:', data);
+      console.log('Upsert error:', error);
+
+      if (error) {
+        console.log('Final error:', error);
+        setMessage('Failed to save companion name: ' + error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      setMessage('');
       setIsLoading(false);
-      return;
-    }
-    const user = userResult.data.user;
-
-    // Save user info to Supabase
-    console.log('About to upsert profile with ID:', user.id, 'first_name:', firstName, 'last_name:', lastName, 'companion_name:', companionName);
-    
-    // Use upsert to handle both insert and update
-    const { data, error } = await supabase
-      .from('profiles')
-      .upsert({ 
-        id: user.id, 
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        companion_name: companionName,
-        communication_mode: communicationMode,
-        accent: selectedAccent
-      }, {
-        onConflict: 'id'
-      })
-      .select();
-    
-    console.log('Upsert result:', data);
-    console.log('Upsert error:', error);
-
-    if (error) {
-console.log('Final error:', error);
-      setMessage('Failed to save companion name.');
+      router.replace('/');
+    } catch (error) {
+      console.error('Error in handleContinue:', error);
+      setMessage('An error occurred. Please try again.');
       setIsLoading(false);
-      return;
     }
-
-    setMessage('');
-    setIsLoading(false);
-    router.replace('/');
   };
 
   return (
