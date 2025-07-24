@@ -85,11 +85,15 @@ export default function SignInScreen() {
     setMessage('Creating your account...');
     
     try {
+      // For development, let's try without email confirmation
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
-          emailRedirectTo: 'exp://localhost:8081' // Use localhost for development
+          emailRedirectTo: 'http://localhost:8081', // Match your Expo server URL
+          data: {
+            // Add any additional user metadata here
+          }
         }
       });
       
@@ -100,11 +104,34 @@ export default function SignInScreen() {
         setMessage(error.message);
       } else if (data.user) {
         console.log('User created successfully:', data.user.id);
-        setMessage('Account created successfully! Redirecting to onboarding...');
-        // Temporarily bypass email confirmation for testing
-        setTimeout(() => {
-          router.replace('/onboarding');
-        }, 2000);
+        setMessage('Account created successfully! Establishing session...');
+        
+        // For development, let's try to sign in immediately
+        setTimeout(async () => {
+          try {
+            // Try to sign in with the same credentials
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+              email,
+              password
+            });
+            
+            console.log('Sign in result:', signInData);
+            console.log('Sign in error:', signInError);
+            
+            if (signInError) {
+              console.log('Sign in failed, redirecting to signin');
+              setMessage('Please sign in manually to continue.');
+              router.replace('/signin');
+            } else {
+              console.log('Sign in successful, redirecting to onboarding');
+              router.replace('/onboarding');
+            }
+          } catch (sessionError) {
+            console.error('Session error:', sessionError);
+            setMessage('Session error. Please sign in manually.');
+            router.replace('/signin');
+          }
+        }, 1000);
       } else {
         setMessage('Account creation failed. Please try again.');
       }
