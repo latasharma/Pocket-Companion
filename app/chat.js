@@ -128,11 +128,13 @@ export default function ChatScreen() {
         const success = await voiceService.startListening();
         if (success) {
           setIsListening(true);
-          // The voice service will handle the input and call handleVoiceResult
+        } else {
+          setIsListening(false);
         }
       } catch (error) {
         console.error('Voice input error:', error);
         Alert.alert('Voice Input Error', 'Could not start voice input. Please try again.');
+        setIsListening(false);
       }
     }
   };
