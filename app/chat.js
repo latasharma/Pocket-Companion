@@ -44,6 +44,8 @@ export default function ChatScreen() {
         if (data && data.length > 0) {
           const profile = data[0];
           console.log('Profile data:', profile); // Debug log
+          console.log('Companion name from DB:', profile.companion_name); // Debug log
+          console.log('Communication mode from DB:', profile.communication_mode); // Debug log
           setUserName(profile.first_name || '');
           setCompanionName(profile.companion_name || 'Pixel');
           console.log('Setting companion name to:', profile.companion_name || 'Pixel'); // Debug log
@@ -93,6 +95,11 @@ export default function ChatScreen() {
     };
     fetchUserInfoAndHistory();
   }, []);
+
+  // Debug companion name changes
+  React.useEffect(() => {
+    console.log('Companion name state changed to:', companionName);
+  }, [companionName]);
 
   // Voice input handlers
   const handleVoiceInput = async () => {
@@ -311,7 +318,7 @@ export default function ChatScreen() {
                 elevation: 2,
               }}>
                 <Text style={{ color: '#666', fontSize: 16 }}>
-                  {companionName} is typing...
+                  {companionName || 'Companion'} is typing...
                 </Text>
               </View>
             </View>

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   last_name TEXT,
   companion_name TEXT,
   communication_mode TEXT DEFAULT 'text' CHECK (communication_mode IN ('text', 'voice')),
-  accent TEXT DEFAULT 'American' CHECK (accent IN ('American', 'British', 'Indian', 'Australian', 'Canadian')),
+  accent TEXT DEFAULT 'American' CHECK (accent IN ('American', 'British', 'Indian', 'Australian', 'Canadian'),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
