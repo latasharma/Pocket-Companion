@@ -88,21 +88,18 @@ export default function SignInScreen() {
       email, 
       password,
       options: {
-        emailRedirectTo: 'exp://192.168.1.100:8081' // Update this to your actual Expo URL
+        emailRedirectTo: 'exp://localhost:8081' // Use localhost for development
       }
     });
     
     if (error) {
       setMessage(error.message);
-    } else if (data.user && !data.user.email_confirmed_at) {
-      setMessage('Please check your email and click the confirmation link to continue.');
-      // Don't redirect - let user confirm email first
     } else {
-      setMessage('Account created successfully! Please check your email for confirmation.');
-      // Only redirect after email confirmation
+      setMessage('Account created successfully! Redirecting to onboarding...');
+      // Temporarily bypass email confirmation for testing
       setTimeout(() => {
         router.replace('/onboarding');
-      }, 3000);
+      }, 2000);
     }
   };
 
