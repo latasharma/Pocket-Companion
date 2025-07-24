@@ -66,12 +66,24 @@ export default function ChatScreen() {
             setMessages(historyMessages);
           } else {
             // No history, show welcome message
+            const welcomeMessage = `Hi ${profile.first_name || 'there'}! I'm ${profile.companion_name || 'Pixel'}, your Pocket Companion. How can I help you today?`;
             setMessages([{
               id: 1,
-              text: `Hi ${profile.first_name || 'there'}! I'm ${profile.companion_name || 'Pixel'}, your Pocket Companion. How can I help you today?`,
+              text: welcomeMessage,
               sender: 'companion',
               timestamp: new Date(),
             }]);
+            
+            // Speak the welcome message if voice mode is enabled
+            if (profile.communication_mode === 'voice') {
+              setTimeout(async () => {
+                try {
+                  await voiceService.speakText(welcomeMessage, profile.accent || 'American');
+                } catch (error) {
+                  console.log('Could not speak welcome message:', error);
+                }
+              }, 1000);
+            }
           }
         }
 
@@ -112,16 +124,30 @@ export default function ChatScreen() {
       await voiceService.stopListening();
       setIsListening(false);
     } else {
-      const success = await voiceService.startListening();
-      if (success) {
-        setIsListening(true);
+      try {
+        const success = await voiceService.startListening();
+        if (success) {
+          setIsListening(true);
+          // The voice service will handle the input and call handleVoiceResult
+        }
+      } catch (error) {
+        console.error('Voice input error:', error);
+        Alert.alert('Voice Input Error', 'Could not start voice input. Please try again.');
       }
     }
   };
 
   const handleVoiceResult = (recognizedText) => {
-    setInputText(recognizedText);
-    setIsListening(false);
+    if (recognizedText && recognizedText.trim()) {
+      setInputText(recognizedText.trim());
+      setIsListening(false);
+      // Automatically send the message if it's not empty
+      setTimeout(() => {
+        sendMessage();
+      }, 500);
+    } else {
+      setIsListening(false);
+    }
   };
 
   const handleBackPress = () => {
@@ -196,6 +222,17 @@ export default function ChatScreen() {
         timestamp: new Date(savedAiMessage.created_at),
       };
       setMessages(prev => [...prev, aiMessageUI]);
+
+      // Speak the AI response if voice mode is enabled
+      if (communicationMode === 'voice') {
+        setTimeout(async () => {
+          try {
+            await voiceService.speakText(aiResponse.content, accent);
+          } catch (error) {
+            console.log('Could not speak AI response:', error);
+          }
+        }, 500);
+      }
 
     } catch (error) {
       console.error('Error sending message:', error);
