@@ -72,7 +72,12 @@ export default function ChatScreen() {
         }
 
         // Initialize voice service
-        await voiceService.initializeVoice();
+        try {
+          await voiceService.initializeVoice();
+        } catch (error) {
+          console.log('Voice service not available:', error);
+          // Continue without voice functionality
+        }
       } catch (error) {
         console.error('Error loading chat history:', error);
         // Show basic welcome message on error
