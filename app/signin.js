@@ -85,10 +85,13 @@ export default function SignInScreen() {
     setMessage('Creating your account...');
     
     try {
-      // Simple signup without email confirmation
+      // For development - skip email confirmation
       const { data, error } = await supabase.auth.signUp({ 
         email, 
-        password
+        password,
+        options: {
+          emailRedirectTo: 'http://localhost:8081'
+        }
       });
       
       console.log('Signup result:', data);
@@ -99,16 +102,11 @@ export default function SignInScreen() {
       } else if (data.user) {
         console.log('User created successfully:', data.user.id);
         
-        // Check if email confirmation is required
-        if (data.user.email_confirmed_at) {
-          // Email already confirmed, proceed to onboarding
-          setMessage('Account created! Redirecting to onboarding...');
+        // For development - proceed immediately without email confirmation
+        setMessage('Account created! Redirecting to onboarding...');
+        setTimeout(() => {
           router.replace('/onboarding');
-        } else {
-          // Email confirmation required
-          setMessage('Please check your email and click the confirmation link, then sign in.');
-          // Don't redirect - let user confirm email first
-        }
+        }, 1000);
       } else {
         setMessage('Account creation failed. Please try again.');
       }
