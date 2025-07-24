@@ -101,35 +101,20 @@ export default function HomeScreen() {
 
         {/* Disclaimer */}
         <View style={{
-          backgroundColor: '#fff3cd',
-          borderColor: '#dc2626',
-          borderWidth: 3,
+          backgroundColor: '#f8f9fa',
+          borderColor: '#e5e7eb',
+          borderWidth: 1,
           borderRadius: 8,
-          padding: 16,
+          padding: 12,
           marginBottom: 24,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          elevation: 5,
         }}>
           <Text style={{
-            fontSize: 16,
-            fontWeight: 'bold',
-            color: '#dc2626',
-            marginBottom: 8,
-            textAlign: 'center',
-          }}>
-            ⚠️ IMPORTANT DISCLAIMER ⚠️
-          </Text>
-          <Text style={{
             fontSize: 12,
-            color: '#dc2626',
-            lineHeight: 16,
+            color: '#6b7280',
             textAlign: 'center',
-            fontWeight: '500',
+            lineHeight: 16,
           }}>
-            This AI companion is for entertainment and general assistance purposes only. We are not responsible for any decisions made based on AI responses. The AI does not provide medical, legal, financial, or professional advice. Always consult qualified professionals for serious matters. Use this app at your own discretion.
+            AI companion for general assistance. For professional advice, consult qualified experts.
           </Text>
         </View>
 

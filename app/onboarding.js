@@ -201,43 +201,33 @@ console.log('Final error:', error);
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={{ color: '#888', fontSize: 12, marginBottom: 16 }}>
-                You can change this later in the settings.
-
-              {/* Disclaimer - Made More Prominent */}
+              {/* Disclaimer - Professional and Balanced */}
               <View style={{
-                backgroundColor: "#fff3cd",
-                borderColor: "#dc2626",
-                borderWidth: 3,
+                backgroundColor: '#f8f9fa',
+                borderColor: '#e5e7eb',
+                borderWidth: 1,
                 borderRadius: 8,
-                padding: 20,
+                padding: 16,
                 marginBottom: 16,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                elevation: 5,
               }}>
                 <Text style={{
-                  fontSize: 18,
-                  fontWeight: "bold",
-                  color: "#dc2626",
-                  marginBottom: 10,
-                  textAlign: "center",
+                  fontSize: 14,
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: 8,
+                  textAlign: 'center',
                 }}>
-                  ⚠️ IMPORTANT DISCLAIMER ⚠️
+                  About Your AI Companion
                 </Text>
                 <Text style={{
-                  fontSize: 14,
-                  color: "#dc2626",
-                  lineHeight: 20,
-                  textAlign: "center",
-                  fontWeight: "500",
+                  fontSize: 12,
+                  color: '#6b7280',
+                  lineHeight: 16,
+                  textAlign: 'center',
                 }}>
-                  This AI companion is for entertainment and general assistance purposes only. We are not responsible for any decisions made based on AI responses. The AI does not provide medical, legal, financial, or professional advice. Always consult qualified professionals for serious matters. Use this app at your own discretion.
+                  Your AI companion is designed to provide helpful conversations and general assistance. For medical, legal, financial, or other professional advice, please consult qualified experts.
                 </Text>
               </View>
-              </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                 <TouchableOpacity
                   onPress={() => setAccepted(!accepted)}

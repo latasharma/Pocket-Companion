@@ -237,17 +237,12 @@ export default function ChatScreen() {
           </Text>
           <View style={{ marginTop: 8 }}>
             <Text style={{
-              fontSize: 14,
-              color: '#dc2626',
+              fontSize: 11,
+              color: '#9ca3af',
               textAlign: 'center',
-              fontWeight: '500',
-              backgroundColor: '#fef2f2',
-              padding: 8,
-              borderRadius: 6,
-              borderWidth: 1,
-              borderColor: '#fecaca',
+              fontStyle: 'italic',
             }}>
-              ⚠️ For entertainment and general assistance only. Not a replacement for professional advice. ⚠️
+              For general assistance only
             </Text>
           </View>
         </View>
