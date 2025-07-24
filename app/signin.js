@@ -81,14 +81,28 @@ export default function SignInScreen() {
       setMessage('Please enter both email and password.');
       return;
     }
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) setMessage(error.message);
-    else {
-      setMessage('Check your email for the confirmation link!');
-      // After sign up, user will need to complete onboarding
+    
+    setMessage('Creating your account...');
+    
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        emailRedirectTo: 'exp://192.168.1.100:8081' // Update this to your actual Expo URL
+      }
+    });
+    
+    if (error) {
+      setMessage(error.message);
+    } else if (data.user && !data.user.email_confirmed_at) {
+      setMessage('Please check your email and click the confirmation link to continue.');
+      // Don't redirect - let user confirm email first
+    } else {
+      setMessage('Account created successfully! Please check your email for confirmation.');
+      // Only redirect after email confirmation
       setTimeout(() => {
         router.replace('/onboarding');
-      }, 2000);
+      }, 3000);
     }
   };
 
