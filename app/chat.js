@@ -220,10 +220,33 @@ export default function ChatScreen() {
     <PaperProvider>
       <View style={{ flex: 1, backgroundColor: '#f0fdf4' }}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Chat with {companionName}</Text>
-          <View style={styles.disclaimerContainer}>
-            <Text style={styles.disclaimerText}>
+        <View style={{
+          backgroundColor: '#ffffff',
+          paddingHorizontal: 20,
+          paddingVertical: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: '#e5e7eb',
+        }}>
+          <Text style={{
+            fontSize: 20,
+            fontWeight: 'bold',
+            color: '#00B686',
+            textAlign: 'center',
+          }}>
+            Chat with {companionName}
+          </Text>
+          <View style={{ marginTop: 8 }}>
+            <Text style={{
+              fontSize: 14,
+              color: '#dc2626',
+              textAlign: 'center',
+              fontWeight: '500',
+              backgroundColor: '#fef2f2',
+              padding: 8,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: '#fecaca',
+            }}>
               ⚠️ For entertainment and general assistance only. Not a replacement for professional advice. ⚠️
             </Text>
           </View>

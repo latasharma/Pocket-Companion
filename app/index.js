@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Image, ActivityIndicator } from 'react-native';
+import { View, Image, ActivityIndicator, Alert } from 'react-native';
 import { Text, Button, Provider as PaperProvider } from 'react-native-paper';
 import { Link, useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -47,6 +47,29 @@ export default function HomeScreen() {
     checkAuthAndFetchProfile();
   }, []);
 
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await supabase.auth.signOut();
+              router.replace('/signin');
+            } catch (error) {
+              console.error('Error signing out:', error);
+              Alert.alert('Error', 'Failed to sign out');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <PaperProvider>
       <View style={{ flex: 1, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -64,7 +87,7 @@ export default function HomeScreen() {
             textAlign: 'center',
             marginBottom: 8,
           }}>
-            Hi {userName}, I’m {companionName}! 👋
+            Hi {userName}, I'm {companionName}! 👋
           </Text>
         )}
         <Text style={{
@@ -75,6 +98,41 @@ export default function HomeScreen() {
         }}>
           How can I help you today?
         </Text>
+
+        {/* Disclaimer */}
+        <View style={{
+          backgroundColor: '#fff3cd',
+          borderColor: '#dc2626',
+          borderWidth: 3,
+          borderRadius: 8,
+          padding: 16,
+          marginBottom: 24,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+          elevation: 5,
+        }}>
+          <Text style={{
+            fontSize: 16,
+            fontWeight: 'bold',
+            color: '#dc2626',
+            marginBottom: 8,
+            textAlign: 'center',
+          }}>
+            ⚠️ IMPORTANT DISCLAIMER ⚠️
+          </Text>
+          <Text style={{
+            fontSize: 12,
+            color: '#dc2626',
+            lineHeight: 16,
+            textAlign: 'center',
+            fontWeight: '500',
+          }}>
+            This AI companion is for entertainment and general assistance purposes only. We are not responsible for any decisions made based on AI responses. The AI does not provide medical, legal, financial, or professional advice. Always consult qualified professionals for serious matters. Use this app at your own discretion.
+          </Text>
+        </View>
+
         <Link href="/chat" asChild>
           <Button
             mode="contained"
@@ -95,12 +153,7 @@ export default function HomeScreen() {
         </Link>
         <Button
           mode="text"
-          onPress={async () => {
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-              console.log('Sign out error:', error);
-            }
-          }}
+          onPress={handleSignOut}
           style={{ marginTop: 8 }}
           labelStyle={{ color: '#666', fontSize: 14 }}
         >
