@@ -21,7 +21,7 @@ export default function OnboardingScreen() {
   React.useEffect(() => {
     const checkProfile = async () => {
       try {
-        const userResult = await supabase.auth.getUser();
+      const userResult = await supabase.auth.getUser();
         console.log('User result:', userResult);
         
         if (!userResult || userResult.error || !userResult.data || !userResult.data.user) {
@@ -30,11 +30,11 @@ export default function OnboardingScreen() {
           return;
         }
         
-        const user = userResult.data.user;
+      const user = userResult.data.user;
         console.log('User found:', user.id);
         
         const { data, error } = await supabase
-          .from('profiles')
+        .from('profiles')
           .select('first_name, companion_name, communication_mode')
           .eq('id', user.id);
         
@@ -43,7 +43,7 @@ export default function OnboardingScreen() {
         
         // Only skip if user has completed full onboarding (including communication mode)
         if (data && data.length > 0 && data[0].first_name && data[0].companion_name && data[0].communication_mode) {
-          router.replace('/');
+        router.replace('/');
         } else if (data && data.length > 0 && data[0].first_name && data[0].companion_name) {
           // User has basic info but not communication mode - load existing data
           setFirstName(data[0].first_name || '');
@@ -82,20 +82,20 @@ export default function OnboardingScreen() {
     setIsLoading(true);
 
     try {
-      const userResult = await supabase.auth.getUser();
+    const userResult = await supabase.auth.getUser();
       console.log('Continue - User result:', userResult);
       
-      if (!userResult || userResult.error || !userResult.data || !userResult.data.user) {
+    if (!userResult || userResult.error || !userResult.data || !userResult.data.user) {
         console.log('No user found in handleContinue');
-        setMessage('User not found. Please sign in again.');
-        setIsLoading(false);
+      setMessage('User not found. Please sign in again.');
+      setIsLoading(false);
         setTimeout(() => {
           router.replace('/signin');
         }, 2000);
-        return;
-      }
+      return;
+    }
       
-      const user = userResult.data.user;
+    const user = userResult.data.user;
       console.log('Continue - User found:', user.id);
 
       // Save user info to Supabase
@@ -119,16 +119,16 @@ export default function OnboardingScreen() {
       console.log('Upsert result:', data);
       console.log('Upsert error:', error);
 
-      if (error) {
-        console.log('Final error:', error);
+    if (error) {
+console.log('Final error:', error);
         setMessage('Failed to save companion name: ' + error.message);
-        setIsLoading(false);
-        return;
-      }
-
-      setMessage('');
       setIsLoading(false);
-      router.replace('/');
+      return;
+    }
+
+    setMessage('');
+    setIsLoading(false);
+    router.replace('/');
     } catch (error) {
       console.error('Error in handleContinue:', error);
       setMessage('An error occurred. Please try again.');
@@ -149,42 +149,42 @@ export default function OnboardingScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-            <Image 
-              source={require('../assets/poco-logo.png')}
-              style={{ width: 80, height: 80, resizeMode: 'contain', marginBottom: 16 }}
-            />
-            <Text style={{
-              color: '#00B686',
-              fontWeight: 'bold',
-              fontSize: 26,
-              letterSpacing: 1,   
-              textAlign: 'center',
-              marginBottom: 8,
-            }}>
-              Welcome to your Pocket Companion!
-            </Text>
-            <Text style={{
-              fontWeight: 'bold',
-              fontSize: 16,
-              color: '#333',
-              marginBottom: 24,
-              textAlign: 'center',
-              width: '80%',
-            }}>
+          <Image 
+            source={require('../assets/poco-logo.png')}
+            style={{ width: 80, height: 80, resizeMode: 'contain', marginBottom: 16 }}
+          />
+          <Text style={{
+            color: '#00B686',
+            fontWeight: 'bold',
+            fontSize: 26,
+            letterSpacing: 1,   
+            textAlign: 'center',
+            marginBottom: 8,
+          }}>
+            Welcome to your Pocket Companion!
+          </Text>
+          <Text style={{
+            fontWeight: 'bold',
+            fontSize: 16,
+            color: '#333',
+            marginBottom: 24,
+            textAlign: 'center',
+            width: '80%',
+          }}>
               Let's get to know each other
-            </Text>
-            <Card style={{
-              width: '90%',
-              maxWidth: 400,
-              padding: 20,
-              borderRadius: 20,
-              elevation: 8,
-              backgroundColor: 'white',
-              shadowColor: '#000',
-              borderWidth: 2,
-              borderColor: '#00B686',
-            }}>
-              <Card.Content>
+          </Text>
+          <Card style={{
+            width: '90%',
+            maxWidth: 400,
+            padding: 20,
+            borderRadius: 20,
+            elevation: 8,
+            backgroundColor: 'white',
+            shadowColor: '#000',
+            borderWidth: 2,
+            borderColor: '#00B686',
+          }}>
+            <Card.Content>
                 <TextInput
                   label="First Name"
                   value={firstName}
@@ -205,16 +205,16 @@ export default function OnboardingScreen() {
                   autoCapitalize="words"
                   mode="outlined"
                 />
-                <TextInput
-                  label="Companion Name"
-                  value={companionName}
-                  onChangeText={setCompanionName}
+              <TextInput
+                label="Companion Name"
+                value={companionName}
+                onChangeText={setCompanionName}
                   placeholder="Enter a name for your companion"
-                  placeholderTextColor="#a3a3a3"
+                placeholderTextColor="#a3a3a3"
                   style={{ marginBottom: 12, backgroundColor: 'white' }}
-                  autoCapitalize="words"
-                  mode="outlined"
-                />
+                autoCapitalize="words"
+                mode="outlined"
+              /> 
 
                 {/* Suggested Names */}
                 <View style={{ marginBottom: 16 }}>
@@ -222,20 +222,20 @@ export default function OnboardingScreen() {
                     Suggested names:
                   </Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                    {SUGGESTED_NAMES.map((name) => (
-                      <TouchableOpacity
-                        key={name}
-                        style={{
+                {SUGGESTED_NAMES.map((name) => (
+                  <TouchableOpacity
+                    key={name}
+                    style={{   
                           backgroundColor: companionName === name ? '#00B686' : '#f3f4f6',
                           paddingVertical: 8,
                           paddingHorizontal: 12,
                           borderRadius: 6,
-                          borderWidth: 1,
+                      borderWidth: 1,
                           borderColor: companionName === name ? '#00B686' : '#d1d5db',
                           margin: 4,
-                        }}
+                    }}
                         onPress={() => setCompanionName(name)}
-                      >
+                  >
                         <Text style={{
                           color: companionName === name ? 'white' : '#374151',
                           fontWeight: '500',
@@ -243,9 +243,9 @@ export default function OnboardingScreen() {
                         }}>
                           {name}
                         </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
                 </View>
 
                 {/* About Your AI Companion */}
@@ -271,31 +271,31 @@ export default function OnboardingScreen() {
                     lineHeight: 20,
                   }}>
                     Your AI companion is designed to provide helpful conversations and general assistance. For medical, legal, financial, or other professional advice, please consult qualified experts.
-                  </Text>
+              </Text>
                 </View>
 
                 {/* Privacy Policy */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                  <TouchableOpacity
-                    onPress={() => setAccepted(!accepted)}
-                    style={{
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setAccepted(!accepted)}
+                  style={{
                       width: 20,
                       height: 20,
-                      borderWidth: 2,
+                    borderWidth: 2,
                       borderColor: accepted ? '#00B686' : '#d1d5db',
                       borderRadius: 4,
-                      marginRight: 8,
+                    marginRight: 8,
                       backgroundColor: accepted ? '#00B686' : 'white',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {accepted && (
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  {accepted && (
                       <Ionicons name="checkmark" size={14} color="white" />
-                    )}
-                  </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
                   <Text style={{ fontSize: 14, color: '#374151', flex: 1 }}>
-                    I accept the{' '}
+                  I accept the{' '}
                     <Text
                       style={{ color: '#00B686', textDecorationLine: 'underline' }}
                       onPress={() => {
@@ -306,31 +306,31 @@ export default function OnboardingScreen() {
                         );
                       }}
                     >
-                      Privacy Policy
-                    </Text>
+                    Privacy Policy
                   </Text>
-                </View>
-                {message ? (
-                  <Text style={{ color: 'red', marginBottom: 8 }}>{message}</Text>
-                ) : null}
-                <Button
-                  mode="contained"
-                  onPress={handleContinue}
-                  loading={isLoading}
-                  disabled={isLoading}
-                  style={{
-                    backgroundColor: '#00B686',
-                    borderRadius: 8,
-                    marginTop: 8,
-                  }}
-                  contentStyle={{ paddingVertical: 8 }}
-                  labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}
-                >
-                  Continue
-                </Button>
-              </Card.Content>
-            </Card>
-          </View>
+                </Text>
+              </View>
+              {message ? (
+                <Text style={{ color: 'red', marginBottom: 8 }}>{message}</Text>
+              ) : null}
+              <Button
+                mode="contained"
+                onPress={handleContinue}
+                loading={isLoading}
+                disabled={isLoading}
+                style={{
+                  backgroundColor: '#00B686',
+                  borderRadius: 8,
+                  marginTop: 8,
+                }}
+                contentStyle={{ paddingVertical: 8 }}
+                labelStyle={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}
+              >
+                Continue
+              </Button>
+            </Card.Content>
+          </Card>
+        </View>
         </ScrollView>
       </KeyboardAvoidingView>  
     </PaperProvider>

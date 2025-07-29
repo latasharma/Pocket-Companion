@@ -17,8 +17,8 @@ export default function HomeScreen() {
         
         if (!user) {
           router.replace('/signin');
-          return;
-        }
+        return;
+      }
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -40,7 +40,7 @@ export default function HomeScreen() {
         console.log('Error checking auth:', error);
         router.replace('/signin');
       } finally {
-        setLoading(false);
+      setLoading(false);
       }
     };
 

@@ -117,19 +117,127 @@ export default function ProfileScreen() {
   };
 
   const openPrivacyPolicy = () => {
-    Alert.alert('Privacy Policy', 'Our privacy policy ensures your data is protected and never shared with third parties. We only collect data necessary to provide you with the best AI companion experience.');
+    router.push('/privacy');
   };
 
   const openTermsOfService = () => {
-    Alert.alert('Terms of Service', 'By using AI Pocket Companion, you agree to use the service responsibly and not for harmful purposes. We reserve the right to modify these terms as needed.');
+    router.push('/terms');
   };
 
   const openSupport = () => {
-    Alert.alert('Contact Support', 'Email us at: lata@hellopoco.app\n\nWe typically respond within 24 hours.');
+    router.push('/support');
   };
 
   const openFAQ = () => {
-    Alert.alert('FAQ', 'Q: How does the AI work?\nA: We use advanced AI models to provide helpful, safe conversations.\n\nQ: Is my data secure?\nA: Yes, all data is encrypted and stored securely.\n\nQ: Can I delete my account?\nA: Yes, contact support to request account deletion.');
+    router.push('/support');
+  };
+
+  const navigateToChat = () => {
+    router.push('/(tabs)/chat');
+  };
+
+  const handleDeleteAccount = async () => {
+    // First confirmation
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action will permanently delete:\n\n• Your profile information\n• All conversation history\n• Your AI companion settings\n• All stored data\n\nThis action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: () => {
+            // Second confirmation
+            Alert.alert(
+              'Final Confirmation',
+              'This is your final warning. Deleting your account will permanently remove all your data and cannot be undone. Are you absolutely sure?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Delete My Account',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      setLoading(true);
+                      console.log('Starting account deletion process...');
+                      
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (!user) {
+                        Alert.alert('Error', 'User not found');
+                        return;
+                      }
+
+                      // Delete conversation history
+                      console.log('Deleting conversation history...');
+                      const { error: messagesError } = await supabase
+                        .from('messages')
+                        .delete()
+                        .eq('user_id', user.id);
+                      
+                      if (messagesError) {
+                        console.error('Error deleting messages:', messagesError);
+                      }
+
+                      // Delete user profile
+                      console.log('Deleting user profile...');
+                      const { error: profileError } = await supabase
+                        .from('profiles')
+                        .delete()
+                        .eq('id', user.id);
+                      
+                      if (profileError) {
+                        console.error('Error deleting profile:', profileError);
+                      }
+
+                      // Delete auth account
+                      console.log('Deleting auth account...');
+                      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+                      
+                      if (authError) {
+                        console.error('Error deleting auth account:', authError);
+                        // If admin delete fails, try user-initiated deletion
+                        const { error: userDeleteError } = await supabase.auth.admin.deleteUser(user.id);
+                        if (userDeleteError) {
+                          console.error('User-initiated deletion also failed:', userDeleteError);
+                          Alert.alert(
+                            'Account Deletion Issue',
+                            'We encountered an issue deleting your account. Please contact support at support@poco.ai for assistance.',
+                            [
+                              { text: 'OK', onPress: () => router.replace('/signin') }
+                            ]
+                          );
+                          return;
+                        }
+                      }
+
+                      console.log('Account deletion completed successfully');
+                      Alert.alert(
+                        'Account Deleted',
+                        'Your account has been permanently deleted. Thank you for using POCO.',
+                        [
+                          { text: 'OK', onPress: () => router.replace('/signin') }
+                        ]
+                      );
+                    } catch (error) {
+                      console.error('Error during account deletion:', error);
+                      Alert.alert(
+                        'Error',
+                        'An error occurred while deleting your account. Please contact support at support@poco.ai for assistance.',
+                        [
+                          { text: 'OK', onPress: () => router.replace('/signin') }
+                        ]
+                      );
+                    } finally {
+                      setLoading(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   if (!user) {
@@ -147,6 +255,12 @@ export default function ProfileScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Profile & Settings</Text>
           <TouchableOpacity
             style={styles.editButton}
@@ -290,9 +404,22 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Communication Preferences</Text>
           <View style={styles.settingsCard}>
-            <View style={styles.settingItem}>
+            <TouchableOpacity style={styles.settingItem} onPress={navigateToChat}>
               <View style={styles.settingLeft}>
                 <Ionicons name="chatbubbles" size={24} color="#00B686" style={styles.settingIcon} />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Start Chat</Text>
+                  <Text style={styles.settingSubtitle}>Chat with Pixel, your AI companion</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+            
+            <View style={styles.divider} />
+            
+            <View style={styles.settingItem}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="settings" size={24} color="#00B686" style={styles.settingIcon} />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Chat Mode</Text>
                   <Text style={styles.settingSubtitle}>
@@ -415,6 +542,29 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Account Management */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account Management</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity 
+              style={[styles.settingItem, styles.deleteAccountItem]} 
+              onPress={handleDeleteAccount}
+              disabled={loading}
+            >
+              <View style={styles.settingLeft}>
+                <Ionicons name="trash" size={24} color="#dc2626" style={styles.settingIcon} />
+                <View style={styles.settingText}>
+                  <Text style={[styles.settingTitle, { color: '#dc2626' }]}>
+                    {loading ? 'Deleting Account...' : 'Delete Account'}
+                  </Text>
+                  <Text style={styles.settingSubtitle}>Permanently delete your account and all data</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Legal */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Legal</Text>
@@ -485,6 +635,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+  },
+  backButton: {
+    padding: 8,
   },
   headerTitle: {
     fontSize: 24,
@@ -653,5 +806,12 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 40,
+  },
+  deleteAccountItem: {
+    borderColor: '#fecaca',
+    borderWidth: 1,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    marginVertical: 4,
   },
 });

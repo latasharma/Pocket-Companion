@@ -235,26 +235,76 @@ export default function ChatScreen() {
           backgroundColor: '#ffffff',
           paddingHorizontal: 20,
           paddingVertical: 16,
+          paddingTop: 50,
           borderBottomWidth: 1,
           borderBottomColor: '#e5e7eb',
         }}>
-          <Text style={{
-            fontSize: 20,
-            fontWeight: 'bold',
-            color: '#00B686',
-            textAlign: 'center',
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}>
-            Chat with {companionName}
-          </Text>
-          <View style={{ marginTop: 8 }}>
-            <Text style={{
-              fontSize: 11,
-              color: '#9ca3af',
-              textAlign: 'center',
-              fontStyle: 'italic',
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
             }}>
-              For general assistance only
-            </Text>
+              <TouchableOpacity 
+                onPress={() => router.push('/(tabs)/')}
+                style={{
+                  padding: 8,
+                  backgroundColor: '#F3F4F6',
+                  borderRadius: 8,
+                  marginRight: 10,
+                }}
+              >
+                <Ionicons name="arrow-back" size={24} color="#3B82F6" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => router.push('/(tabs)/settings')}
+                style={{
+                  padding: 8,
+                  backgroundColor: '#F3F4F6',
+                  borderRadius: 8,
+                }}
+              >
+                <Ionicons name="settings" size={24} color="#3B82F6" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={{
+              flex: 1,
+              alignItems: 'center',
+            }}>
+              <Text style={{
+                fontSize: 20,
+                fontWeight: 'bold',
+                color: '#00B686',
+                textAlign: 'center',
+              }}>
+                Chat with {companionName}
+              </Text>
+              <View style={{ marginTop: 8 }}>
+                <Text style={{
+                  fontSize: 11,
+                  color: '#9ca3af',
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                }}>
+                  For general assistance only
+                </Text>
+              </View>
+            </View>
+            
+            <TouchableOpacity 
+              onPress={() => router.push('/profile')}
+              style={{
+                padding: 8,
+                backgroundColor: '#F3F4F6',
+                borderRadius: 8,
+              }}
+            >
+              <Ionicons name="person" size={24} color="#3B82F6" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -339,7 +389,7 @@ export default function ChatScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
-      </View>
+    </View>
     </PaperProvider>
   );
 }
