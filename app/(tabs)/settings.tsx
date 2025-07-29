@@ -37,20 +37,19 @@ export default function SettingsScreen() {
   };
 
   const navigateToPrivacy = () => {
-    // For now, just show an alert since these screens don't exist yet
-    Alert.alert('Privacy Policy', 'Your conversations are encrypted with end-to-end encryption. Only you can read your messages.');
+    router.push('/privacy');
   };
 
   const navigateToTerms = () => {
-    Alert.alert('Terms of Service', 'POCO terms and conditions will be displayed here.');
+    router.push('/terms');
   };
 
   const navigateToSupport = () => {
-    Alert.alert('Support', 'Contact us at support@poco.ai for help.');
+    router.push('/support');
   };
 
   const navigateToAbout = () => {
-    Alert.alert('About POCO', 'POCO v1.0.0 - Your private AI companion with end-to-end encryption.');
+    router.push('/about');
   };
 
   return (
@@ -59,7 +58,7 @@ export default function SettingsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>Manage your POCO experience</Text>
+          <Text style={styles.subtitle}>Manage your PoCo experience</Text>
         </View>
 
         {/* Security Status Card */}
@@ -144,7 +143,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <TouchableOpacity onPress={navigateToAbout}>
             <List.Item
-              title="About POCO"
+              title="About PoCo"
               description="Version and app information"
               left={(props) => <List.Icon {...props} icon="information" />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}

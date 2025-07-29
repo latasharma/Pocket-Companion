@@ -13,8 +13,11 @@ export default function PrivacyScreen() {
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Privacy Policy</Text>
-          <Text style={styles.subtitle}>How we protect your data</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#3B82F6" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Privacy Policy</Text>
+          <View style={styles.headerSpacer} />
         </View>
 
         {/* E2EE Card */}
@@ -25,7 +28,7 @@ export default function PrivacyScreen() {
               <Text style={styles.e2eeTitle}>End-to-End Encryption</Text>
             </View>
             <Text style={styles.e2eeDescription}>
-              POCO uses client-side encryption to ensure your conversations with Pixel remain completely private. 
+              PoCo uses client-side encryption to ensure your conversations with Pixel remain completely private. 
               Your messages are encrypted on your device before being sent to our servers, and only you can decrypt them.
             </Text>
             <View style={styles.featureList}>
@@ -178,6 +181,22 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    padding: 5,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 40, // Adjust as needed for spacing
   },
   title: {
     fontSize: 28,
