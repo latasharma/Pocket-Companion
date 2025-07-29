@@ -1,10 +1,13 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Card, List } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export default function PrivacyScreen() {
+  const router = useRouter();
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -140,21 +143,24 @@ export default function PrivacyScreen() {
             </Text>
             <List.Item
               title="Email"
-              description="privacy@poco.ai"
+              description="lata@hellopoco.app"
               left={(props) => <List.Icon {...props} icon="mail" />}
             />
-            <List.Item
-              title="Support"
-              description="Get help with privacy concerns"
-              left={(props) => <List.Icon {...props} icon="help-circle" />}
-            />
+            <TouchableOpacity onPress={() => router.push('/support')}>
+              <List.Item
+                title="Support"
+                description="Get help with privacy concerns"
+                left={(props) => <List.Icon {...props} icon="help-circle" />}
+                right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              />
+            </TouchableOpacity>
           </Card.Content>
         </Card>
 
         {/* Last Updated */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Last updated: January 2025</Text>
-          <Text style={styles.footerSubtext}>POCO v1.0.0</Text>
+          <Text style={styles.footerSubtext}>PoCo v1.0.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
