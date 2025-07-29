@@ -21,7 +21,7 @@ export default function HomeScreen() {
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Welcome to POCO</Text>
+          <Text style={styles.title}>Welcome to PoCo</Text>
           <Text style={styles.subtitle}>Your private AI companion</Text>
         </View>
 
@@ -63,7 +63,7 @@ export default function HomeScreen() {
 
         {/* Features */}
         <View style={styles.featuresContainer}>
-          <Text style={styles.featuresTitle}>What POCO Offers</Text>
+          <Text style={styles.featuresTitle}>What PoCo Offers</Text>
           <View style={styles.featureList}>
             <View style={styles.featureItem}>
               <Ionicons name="shield-checkmark" size={20} color="#10B981" />

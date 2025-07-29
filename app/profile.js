@@ -201,7 +201,7 @@ export default function ProfileScreen() {
                           console.error('User-initiated deletion also failed:', userDeleteError);
                           Alert.alert(
                             'Account Deletion Issue',
-                            'We encountered an issue deleting your account. Please contact support at support@poco.ai for assistance.',
+                            'We encountered an issue deleting your account. Please contact support at lata@hellopoco.app for assistance.',
                             [
                               { text: 'OK', onPress: () => router.replace('/signin') }
                             ]
@@ -213,7 +213,7 @@ export default function ProfileScreen() {
                       console.log('Account deletion completed successfully');
                       Alert.alert(
                         'Account Deleted',
-                        'Your account has been permanently deleted. Thank you for using POCO.',
+                        'Your account has been permanently deleted. Thank you for using PoCo.',
                         [
                           { text: 'OK', onPress: () => router.replace('/signin') }
                         ]
@@ -222,7 +222,7 @@ export default function ProfileScreen() {
                       console.error('Error during account deletion:', error);
                       Alert.alert(
                         'Error',
-                        'An error occurred while deleting your account. Please contact support at support@poco.ai for assistance.',
+                        'An error occurred while deleting your account. Please contact support at lata@hellopoco.app for assistance.',
                         [
                           { text: 'OK', onPress: () => router.replace('/signin') }
                         ]
