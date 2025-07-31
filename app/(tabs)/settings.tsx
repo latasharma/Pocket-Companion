@@ -167,7 +167,7 @@ export default function SettingsScreen() {
 
         {/* App Version */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>POCO v1.0.0</Text>
+          <Text style={styles.versionText}>PoCo v1.0.0</Text>
           <Text style={styles.versionSubtext}>Your private AI companion</Text>
         </View>
       </ScrollView>

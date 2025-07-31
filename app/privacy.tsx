@@ -1,23 +1,17 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { Text, Card, List } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 
 export default function PrivacyScreen() {
-  const router = useRouter();
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#3B82F6" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Privacy Policy</Text>
-          <View style={styles.headerSpacer} />
+          <Text style={styles.title}>Privacy Policy</Text>
+          <Text style={styles.subtitle}>How we protect your data</Text>
         </View>
 
         {/* E2EE Card */}
@@ -28,7 +22,7 @@ export default function PrivacyScreen() {
               <Text style={styles.e2eeTitle}>End-to-End Encryption</Text>
             </View>
             <Text style={styles.e2eeDescription}>
-              PoCo uses client-side encryption to ensure your conversations with Pixel remain completely private. 
+              POCO uses client-side encryption to ensure your conversations with Pixel remain completely private. 
               Your messages are encrypted on your device before being sent to our servers, and only you can decrypt them.
             </Text>
             <View style={styles.featureList}>
@@ -146,24 +140,21 @@ export default function PrivacyScreen() {
             </Text>
             <List.Item
               title="Email"
-              description="lata@hellopoco.app"
+              description="privacy@poco.ai"
               left={(props) => <List.Icon {...props} icon="mail" />}
             />
-            <TouchableOpacity onPress={() => router.push('/support')}>
-              <List.Item
-                title="Support"
-                description="Get help with privacy concerns"
-                left={(props) => <List.Icon {...props} icon="help-circle" />}
-                right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              />
-            </TouchableOpacity>
+            <List.Item
+              title="Support"
+              description="Get help with privacy concerns"
+              left={(props) => <List.Icon {...props} icon="help-circle" />}
+            />
           </Card.Content>
         </Card>
 
         {/* Last Updated */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Last updated: January 2025</Text>
-          <Text style={styles.footerSubtext}>PoCo v1.0.0</Text>
+          <Text style={styles.footerSubtext}>POCO v1.0.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -181,22 +172,6 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    padding: 5,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40, // Adjust as needed for spacing
   },
   title: {
     fontSize: 28,
