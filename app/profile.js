@@ -10,16 +10,20 @@ import {
   Switch,
   Image,
   Linking,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { router } from 'expo-router';
 import { aiService } from '../lib/aiService';
+import { Card, Button, Divider } from 'react-native-paper';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   console.log('Profile screen loaded - version 3.0'); // Test log
   
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -31,6 +35,9 @@ export default function ProfileScreen() {
   const [dataCollection, setDataCollection] = useState(true);
   const [analytics, setAnalytics] = useState(true);
   const [notifications, setNotifications] = useState(true);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
 
   useEffect(() => {
     fetchUserProfile();
@@ -118,19 +125,19 @@ export default function ProfileScreen() {
   };
 
   const openPrivacyPolicy = () => {
-    Linking.openURL('https://www.hellopoco.app/privacy');
+    setShowPrivacyModal(true);
   };
 
   const openTermsOfService = () => {
-    Linking.openURL('https://www.hellopoco.app/terms');
+    setShowTermsModal(true);
   };
 
   const openSupport = () => {
-    Linking.openURL('https://www.hellopoco.app/support');
+    setShowSupportModal(true);
   };
 
   const openFAQ = () => {
-    Linking.openURL('https://www.hellopoco.app/support');
+    setShowSupportModal(true);
   };
 
   const navigateToChat = () => {
@@ -240,6 +247,137 @@ export default function ProfileScreen() {
       ]
     );
   };
+
+  const PrivacyModal = () => (
+    <Modal
+      visible={showPrivacyModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Privacy Policy</Text>
+          <TouchableOpacity onPress={() => setShowPrivacyModal(false)} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.privacyContent}>
+            <Text style={styles.privacySectionTitle}>Your Privacy Matters</Text>
+            <Text style={styles.privacyText}>
+              PoCo uses end-to-end encryption to ensure your conversations remain completely private.
+            </Text>
+            
+            <Text style={styles.privacySectionTitle}>What We Collect</Text>
+            <Text style={styles.privacyText}>
+              • Account information (email, name){'\n'}
+              • Message metadata (timestamps, IDs){'\n'}
+              • Device information for app functionality
+            </Text>
+            
+            <Text style={styles.privacySectionTitle}>What We Don't Collect</Text>
+            <Text style={styles.privacyText}>
+              • Your actual message content (encrypted){'\n'}
+              • Personal conversations{'\n'}
+              • Private data beyond what's needed for the service
+            </Text>
+            
+            <Text style={styles.privacySectionTitle}>Contact Us</Text>
+            <Text style={styles.privacyText}>
+              Email: lata@hellopoco.app{'\n'}
+              Website: www.hellopoco.app
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+
+  const TermsModal = () => (
+    <Modal
+      visible={showTermsModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Terms of Service</Text>
+          <TouchableOpacity onPress={() => setShowTermsModal(false)} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.privacyContent}>
+            <Text style={styles.privacySectionTitle}>Agreement</Text>
+            <Text style={styles.privacyText}>
+              By using PoCo, you agree to use the service responsibly and not for harmful purposes.
+            </Text>
+            
+            <Text style={styles.privacySectionTitle}>Service Description</Text>
+            <Text style={styles.privacyText}>
+              PoCo is an AI companion app that provides personalized conversational experiences with end-to-end encryption.
+            </Text>
+            
+            <Text style={styles.privacySectionTitle}>Acceptable Use</Text>
+            <Text style={styles.privacyText}>
+              • Use responsibly and safely{'\n'}
+              • Don't violate laws or rights of others{'\n'}
+              • Don't transmit harmful content{'\n'}
+              • Don't attempt unauthorized access
+            </Text>
+            
+            <Text style={styles.privacySectionTitle}>Contact</Text>
+            <Text style={styles.privacyText}>
+              Email: lata@hellopoco.app{'\n'}
+              Website: www.hellopoco.app
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+
+  const SupportModal = () => (
+    <Modal
+      visible={showSupportModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Support & Help</Text>
+          <TouchableOpacity onPress={() => setShowSupportModal(false)} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={styles.modalContent}>
+          <View style={styles.privacyContent}>
+            <Text style={styles.privacySectionTitle}>Contact Support</Text>
+            <Text style={styles.privacyText}>
+              Email: lata@hellopoco.app{'\n'}
+              Response time: Within 24 hours
+            </Text>
+            
+            <Text style={styles.privacySectionTitle}>FAQ</Text>
+            <Text style={styles.privacyText}>
+              <Text style={styles.faqQuestion}>Q: How does PoCo protect my privacy?</Text>{'\n'}
+              A: We use end-to-end encryption. Your messages are encrypted and only you can read them.
+            </Text>
+            
+            <Text style={styles.privacyText}>
+              <Text style={styles.faqQuestion}>Q: Can I change my companion's name?</Text>{'\n'}
+              A: Yes! You can customize your companion's name in Profile & Settings.
+            </Text>
+            
+            <Text style={styles.privacyText}>
+              <Text style={styles.faqQuestion}>Q: Is PoCo free to use?</Text>{'\n'}
+              A: PoCo offers a free tier with basic features.
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
 
   if (!user) {
     return (
@@ -605,6 +743,11 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.bottomSpacing} />
+
+        {/* Modals */}
+        <PrivacyModal />
+        <TermsModal />
+        <SupportModal />
       </ScrollView>
     </SafeAreaView>
   );
@@ -814,5 +957,57 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginHorizontal: 4,
     marginVertical: 4,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  privacyContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+  },
+  privacySectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#047857',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  privacyText: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  faqQuestion: {
+    fontWeight: '600',
+    color: '#1F2937',
   },
 });
