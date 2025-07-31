@@ -9,6 +9,7 @@ import {
   Alert,
   Switch,
   Image,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -117,19 +118,19 @@ export default function ProfileScreen() {
   };
 
   const openPrivacyPolicy = () => {
-    router.push('/privacy');
+    Linking.openURL('https://www.hellopoco.app/privacy');
   };
 
   const openTermsOfService = () => {
-    router.push('/terms');
+    Linking.openURL('https://www.hellopoco.app/terms');
   };
 
   const openSupport = () => {
-    router.push('/support');
+    Linking.openURL('https://www.hellopoco.app/support');
   };
 
   const openFAQ = () => {
-    router.push('/support');
+    Linking.openURL('https://www.hellopoco.app/support');
   };
 
   const navigateToChat = () => {

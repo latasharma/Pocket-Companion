@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
 import { Text, List, Divider, Card } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,19 +37,19 @@ export default function SettingsScreen() {
   };
 
   const navigateToPrivacy = () => {
-    router.push('/privacy');
+    Linking.openURL('https://www.hellopoco.app/privacy');
   };
 
   const navigateToTerms = () => {
-    router.push('/terms');
+    Linking.openURL('https://www.hellopoco.app/terms');
   };
 
   const navigateToSupport = () => {
-    router.push('/support');
+    Linking.openURL('https://www.hellopoco.app/support');
   };
 
   const navigateToAbout = () => {
-    router.push('/about');
+    Linking.openURL('https://www.hellopoco.app');
   };
 
   return (
