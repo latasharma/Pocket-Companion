@@ -1,176 +1,114 @@
-import * as React from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Alert } from 'react-native';
-import { Text, TextInput, Button, Card, Provider as PaperProvider, IconButton } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+  Image,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
-import { AIService } from '../lib/aiService';
+import { useRouter } from 'expo-router';
 
 export default function ChatScreen() {
-  const [messages, setMessages] = React.useState([
-    {
-      id: 1,
-      text: "Hi Lata! I'm Pixel, your Pocket Companion. How can I help you today?",
-      sender: 'companion',
-      timestamp: new Date(),
-    }
-  ]);
-  const [inputText, setInputText] = React.useState('');
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [userName, setUserName] = React.useState('');
-  const [companionName, setCompanionName] = React.useState('');
-  const scrollViewRef = React.useRef();
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [companionName, setCompanionName] = useState('Pixel');
+  const [userId, setUserId] = useState(null);
+  const flatListRef = useRef(null);
   const router = useRouter();
 
-  React.useEffect(() => {
-    const fetchUserInfoAndHistory = async () => {
-      try {
-        const userResult = await supabase.auth.getUser();
-        if (!userResult || userResult.error || !userResult.data || !userResult.data.user) {
-          return;
-        }
-        const user = userResult.data.user;
-
-        // Get user profile
-        const { data } = await supabase
-          .from('profiles')
-          .select('first_name, companion_name')
-          .eq('id', user.id);
-
-        if (data && data.length > 0) {
-          const profile = data[0];
-          console.log('Profile data:', profile); // Debug log
-          console.log('Companion name from DB:', profile.companion_name); // Debug log
-          setUserName(profile.first_name || '');
-          setCompanionName(profile.companion_name || 'Pixel');
-          console.log('Setting companion name to:', profile.companion_name || 'Pixel'); // Debug log
-          
-          // Get conversation history
-          const conversationHistory = await AIService.getConversationHistory(user.id, 20);
-          
-          if (conversationHistory.length > 0) {
-            // Convert database messages to UI format
-            const historyMessages = conversationHistory.map(msg => ({
-              id: msg.id,
-              text: msg.content,
-              sender: msg.sender_type === 'user' ? 'user' : 'companion',
-              timestamp: new Date(msg.created_at),
-            }));
-            setMessages(historyMessages);
-          } else {
-            // No history, show welcome message
-            const welcomeMessage = `Hi ${profile.first_name || 'there'}! I'm ${profile.companion_name || 'Pixel'}, your Pocket Companion. How can I help you today?`;
-            setMessages([{
-              id: 1,
-              text: welcomeMessage,
-              sender: 'companion',
-              timestamp: new Date(),
-            }]);
-          }
-        }
-
-      } catch (error) {
-        console.error('Error loading chat history:', error);
-        // Show basic welcome message on error
-        setMessages([{
-          id: 1,
-          text: "Hi! I'm Pixel, your Pocket Companion. How can I help you today?",
-          sender: 'companion',
-          timestamp: new Date(),
-        }]);
-      }
-    };
-    fetchUserInfoAndHistory();
+  useEffect(() => {
+    initializeChat();
   }, []);
 
-  // Debug companion name changes
-  React.useEffect(() => {
-    console.log('Companion name state changed to:', companionName);
-  }, [companionName]);
+  const initializeChat = async () => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+      
+      setUserId(user.id);
 
-  const handleBackPress = () => {
-    if (messages.length > 1) {
-      Alert.alert(
-        'Leave Chat?',
-        'Are you sure you want to leave the chat? Your conversation will be saved.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Leave', style: 'destructive', onPress: () => router.back() },
-        ]
-      );
-    } else {
-      router.back();
+      // Get user profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, companion_name')
+        .eq('id', user.id);
+
+      if (profile && profile.length > 0) {
+        setUserName(profile[0].first_name || '');
+        setCompanionName(profile[0].companion_name || 'Pixel');
+      }
+
+      // Add welcome message
+      const welcomeMessage = {
+        id: Date.now(),
+        text: `Hi ${profile?.[0]?.first_name || 'there'}! I'm ${profile?.[0]?.companion_name || 'Pixel'}, your Pocket Companion. How can I help you today?`,
+        sender: 'ai',
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages([welcomeMessage]);
+
+    } catch (error) {
+      console.error('Error initializing chat:', error);
+      // Don't show error alert, just add a fallback message
+      const fallbackMessage = {
+        id: Date.now(),
+        text: `Hi there! I'm ${companionName}, your Pocket Companion. How can I help you today?`,
+        sender: 'ai',
+        timestamp: new Date().toISOString(),
+      };
+      setMessages([fallbackMessage]);
     }
   };
 
   const sendMessage = async () => {
     if (!inputText.trim() || isLoading) return;
 
-    const userMessageText = inputText.trim();
+    const userMessage = {
+      id: Date.now(),
+      text: inputText.trim(),
+      sender: 'user',
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
 
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        Alert.alert('Error', 'Please sign in again.');
-        return;
-      }
-
-      // Save user message to database
-      const userMessage = await AIService.saveMessageToDatabase(
-        user.id,
-        userMessageText,
-        'user'
-      );
-
-      // Add user message to UI
-      const userMessageUI = {
-        id: userMessage.id,
-        text: userMessageText,
-        sender: 'user',
-        timestamp: new Date(userMessage.created_at),
+      // Simple AI response for now
+      const response = getSimpleAIResponse(inputText.trim(), companionName, userName);
+      
+      const aiMessage = {
+        id: Date.now() + 1,
+        text: response,
+        sender: 'ai',
+        timestamp: new Date().toISOString(),
       };
-      setMessages(prev => [...prev, userMessageUI]);
 
-      // Get conversation history for context
-      const conversationHistory = await AIService.getConversationHistory(user.id, 10);
-
-      // Get AI response
-      const aiResponse = await AIService.sendMessage(
-        userMessageText,
-        conversationHistory,
-        companionName
-      );
-
-      // Save AI response to database
-      const savedAiMessage = await AIService.saveMessageToDatabase(
-        user.id,
-        aiResponse.content,
-        'companion',
-        userMessage.conversation_id
-      );
-
-      // Add AI response to UI
-      const aiMessageUI = {
-        id: savedAiMessage.id,
-        text: aiResponse.content,
-        sender: 'companion',
-        timestamp: new Date(savedAiMessage.created_at),
-      };
-      setMessages(prev => [...prev, aiMessageUI]);
-
+      setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', error.message || 'Failed to send message. Please try again.');
-      
-      // Add error message to UI
       const errorMessage = {
-        id: Date.now(),
-        text: 'Sorry, I\'m having trouble responding right now. Please try again.',
-        sender: 'companion',
-        timestamp: new Date(),
+        id: Date.now() + 1,
+        text: "I'm having trouble processing your message right now. Please try again in a moment.",
+        sender: 'ai',
+        timestamp: new Date().toISOString(),
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -178,218 +116,277 @@ export default function ChatScreen() {
     }
   };
 
-  const renderMessage = (message) => {
-    const isUser = message.sender === 'user';
+  const getSimpleAIResponse = (message, companionName, userName) => {
+    const lowerMessage = message.toLowerCase();
     
-    return (
-      <View
-        key={message.id}
-        style={{
-          flexDirection: 'row',
-          marginVertical: 4,
-          paddingHorizontal: 16,
-          justifyContent: isUser ? 'flex-end' : 'flex-start',
-        }}
-      >
-        <View
-          style={{
-            maxWidth: '80%',
-            backgroundColor: isUser ? '#00B686' : '#f8f9fa',
-            borderRadius: 18,
-            padding: 12,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-            elevation: 2,
-          }}
-        >
-          <Text
-            style={{
-              color: isUser ? 'white' : '#333',
-              fontSize: 16,
-              lineHeight: 22,
-            }}
-          >
-            {message.text}
-          </Text>
-          <Text
-            style={{
-              color: isUser ? 'rgba(255,255,255,0.7)' : '#999',
-              fontSize: 12,
-              marginTop: 4,
-            }}
-          >
-            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </View>
-      </View>
-    );
+    if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
+      return `Hello ${userName || 'there'}! How can I help you today?`;
+    }
+    
+    if (lowerMessage.includes('medication') || lowerMessage.includes('medicine') || lowerMessage.includes('pill')) {
+      return `I can help you with medication reminders! You can set up your medications in the settings. Would you like me to remind you about your medications?`;
+    }
+    
+    if (lowerMessage.includes('reminder') || lowerMessage.includes('remind')) {
+      return `I'm here to help with reminders! You can set up medication reminders, appointments, and other important tasks. What would you like to be reminded about?`;
+    }
+    
+    if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
+      return `I'm ${companionName}, your AI assistant! I can help you with:
+• Medication reminders
+• General conversation and support
+• Task organization
+• Information and questions
+
+What would you like to know more about?`;
+    }
+    
+    return `Thanks for your message! I'm here to help you stay organized and on track. Is there anything specific you'd like assistance with?`;
   };
 
+  const renderMessage = ({ item }) => (
+    <View style={[styles.messageContainer, item.sender === 'user' ? styles.userMessage : styles.aiMessage]}>
+      <View style={[styles.messageBubble, item.sender === 'user' ? styles.userBubble : styles.aiBubble]}>
+        <Text style={[styles.messageText, item.sender === 'user' ? styles.userText : styles.aiText]}>
+          {item.text}
+        </Text>
+        <Text style={styles.timestamp}>
+          {new Date(item.timestamp).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })}
+        </Text>
+      </View>
+    </View>
+  );
+
   return (
-    <PaperProvider>
-      <View style={{ flex: 1, backgroundColor: '#f0fdf4' }}>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
         {/* Header */}
-        <View style={{
-          backgroundColor: '#ffffff',
-          paddingHorizontal: 20,
-          paddingVertical: 16,
-          paddingTop: 50,
-          borderBottomWidth: 1,
-          borderBottomColor: '#e5e7eb',
-        }}>
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}>
-              <TouchableOpacity 
-                onPress={() => router.push('/(tabs)/')}
-                style={{
-                  padding: 8,
-                  backgroundColor: '#F3F4F6',
-                  borderRadius: 8,
-                  marginRight: 10,
-                }}
-              >
-                <Ionicons name="arrow-back" size={24} color="#3B82F6" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => router.push('/(tabs)/settings')}
-                style={{
-                  padding: 8,
-                  backgroundColor: '#F3F4F6',
-                  borderRadius: 8,
-                }}
-              >
-                <Ionicons name="settings" size={24} color="#3B82F6" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={{
-              flex: 1,
-              alignItems: 'center',
-            }}>
-              <Text style={{
-                fontSize: 20,
-                fontWeight: 'bold',
-                color: '#00B686',
-                textAlign: 'center',
-              }}>
-                Chat with {companionName}
-              </Text>
-              <View style={{ marginTop: 8 }}>
-                <Text style={{
-                  fontSize: 11,
-                  color: '#9ca3af',
-                  textAlign: 'center',
-                  fontStyle: 'italic',
-                }}>
-                  For general assistance only
-                </Text>
-              </View>
-            </View>
-            
-            <TouchableOpacity 
+        <View style={styles.header}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <TouchableOpacity
               onPress={() => router.push('/profile')}
-              style={{
-                padding: 8,
-                backgroundColor: '#F3F4F6',
-                borderRadius: 8,
-              }}
+              style={{ padding: 8 }}
             >
-              <Ionicons name="person" size={24} color="#3B82F6" />
+              <Ionicons name="person-circle" size={32} color="#10b981" />
             </TouchableOpacity>
+            
+            <View style={{ alignItems: 'center', flex: 1 }}>
+              <Image
+                source={require('../assets/poco-logo.png')}
+                style={{ width: 40, height: 40, resizeMode: 'contain', marginBottom: 4 }}
+              />
+              <Text style={styles.headerTitle}>Chat with {companionName}</Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Quick Actions',
+                  'What would you like to do?',
+                  [
+                    {
+                      text: 'Add Medication',
+                      onPress: () => router.push('/medication-onboarding')
+                    },
+                    {
+                      text: 'View Profile',
+                      onPress: () => router.push('/profile')
+                    },
+                    {
+                      text: 'Cancel',
+                      style: 'cancel'
+                    }
+                  ]
+                );
+              }}
+              style={{ padding: 8 }}
+            >
+              <Ionicons name="ellipsis-horizontal" size={24} color="#10b981" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.disclaimerContainer}>
+            <Text style={styles.disclaimerText}>
+              ⚠️ For entertainment and general assistance only. Not a replacement for professional advice.
+            </Text>
           </View>
         </View>
 
         {/* Messages */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingVertical: 16, paddingBottom: 20 }}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {messages.map(renderMessage)}
-          {isLoading && (
-            <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
-              <View style={{ 
-                backgroundColor: '#f8f9fa', 
-                borderRadius: 18, 
-                maxWidth: '80%',
-                padding: 12,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.1,
-                shadowRadius: 2,
-                elevation: 2,
-              }}>
-                <Text style={{ color: '#666', fontSize: 16 }}>
-                  {companionName || 'Companion'} is typing...
-                </Text>
-              </View>
-            </View>
-          )}
-        </ScrollView>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={item => item.id.toString()}
+          style={styles.messagesList}
+          contentContainerStyle={styles.messagesContainer}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        />
 
-        {/* Input Area */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-          style={{ backgroundColor: 'white' }}
-        >
-          <View style={{
-            backgroundColor: 'white',
-            borderTopWidth: 1,
-            borderTopColor: '#e5e7eb',
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <TextInput
-                  value={inputText}
-                  onChangeText={setInputText}
-                  placeholder="Type your message..."
-                  placeholderTextColor="#999"
-                  multiline
-                  maxLength={500}
-                  style={{
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: 20,
-                    maxHeight: 100,
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                  }}
-                  contentStyle={{ fontSize: 16 }}
-                />
-              </View>
-              
-              <TouchableOpacity
-                onPress={sendMessage}
-                disabled={!inputText.trim() || isLoading}
-                style={{
-                  backgroundColor: inputText.trim() && !isLoading ? '#00B686' : '#e5e7eb',
-                  borderRadius: 20,
-                  width: 40,
-                  height: 40,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{ color: 'white', fontSize: 18 }}>→</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Loading indicator */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#10b981" />
+            <Text style={styles.loadingText}>{companionName} is thinking...</Text>
           </View>
-        </KeyboardAvoidingView>
-    </View>
-    </PaperProvider>
+        )}
+
+        {/* Input */}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Type your message..."
+            placeholderTextColor="#9ca3af"
+            multiline
+            maxLength={1000}
+            editable={!isLoading}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, (!inputText.trim() || isLoading) && styles.sendButtonDisabled]}
+            onPress={sendMessage}
+            disabled={!inputText.trim() || isLoading}
+          >
+            <Ionicons 
+              name="send" 
+              size={20} 
+              color={inputText.trim() && !isLoading ? "#ffffff" : "#9ca3af"} 
+            />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#10b981',
+    textAlign: 'center',
+  },
+  disclaimerText: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  disclaimerContainer: {
+    marginTop: 8,
+  },
+  messagesList: {
+    flex: 1,
+  },
+  messagesContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  messageContainer: {
+    marginVertical: 4,
+  },
+  userMessage: {
+    alignItems: 'flex-end',
+  },
+  aiMessage: {
+    alignItems: 'flex-start',
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  userBubble: {
+    backgroundColor: '#10b981',
+  },
+  aiBubble: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  userText: {
+    color: '#ffffff',
+  },
+  aiText: {
+    color: '#1f2937',
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 4,
+    textAlign: 'right',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  textInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginRight: 8,
+    fontSize: 16,
+    color: '#1f2937',
+    backgroundColor: '#ffffff',
+    maxHeight: 100,
+  },
+  sendButton: {
+    backgroundColor: '#10b981',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#e5e7eb',
+  },
+});

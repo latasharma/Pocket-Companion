@@ -12,6 +12,9 @@ export default function RootLayout() {
       <Stack.Screen name="signin" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="chat" />
+      <Stack.Screen name="reminder-choice" />
+      <Stack.Screen name="other-reminders" />
+      <Stack.Screen name="medication-onboarding" />
     </Stack>
   );
 }

@@ -8,21 +8,13 @@ import {
   TextInput,
   Alert,
   Switch,
-  Image,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { router } from 'expo-router';
-import { aiService } from '../lib/aiService';
-import { Card, Button, Divider } from 'react-native-paper';
-import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
-  console.log('Profile screen loaded - version 3.0'); // Test log
-  
-  const router = useRouter();
   const [user, setUser] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -30,13 +22,9 @@ export default function ProfileScreen() {
   const [companionName, setCompanionName] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Privacy settings
   const [dataCollection, setDataCollection] = useState(true);
   const [analytics, setAnalytics] = useState(true);
   const [notifications, setNotifications] = useState(true);
-  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const [showTermsModal, setShowTermsModal] = useState(false);
-  const [showSupportModal, setShowSupportModal] = useState(false);
 
   useEffect(() => {
     fetchUserProfile();
@@ -97,7 +85,6 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
-    console.log('Sign out button pressed'); // Debug log
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
@@ -107,15 +94,45 @@ export default function ProfileScreen() {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
-            console.log('User confirmed sign out'); // Debug log
             try {
-              console.log('Calling supabase.auth.signOut()'); // Debug log
               await supabase.auth.signOut();
-              console.log('Sign out successful, navigating to signin'); // Debug log
-              router.replace('/signin');
+              router.replace('/auth');
             } catch (error) {
               console.error('Error signing out:', error);
               Alert.alert('Error', 'Failed to sign out');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const { error } = await supabase
+                .from('profiles')
+                .delete()
+                .eq('id', user.id);
+
+              if (error) throw error;
+
+              await supabase.auth.signOut();
+              router.replace('/auth');
+            } catch (error) {
+              console.error('Error deleting account:', error);
+              Alert.alert('Error', 'Failed to delete account');
+            } finally {
+              setLoading(false);
             }
           },
         },
@@ -136,158 +153,29 @@ export default function ProfileScreen() {
   };
 
   const openFAQ = () => {
-    router.push('/support');
+    router.push('/about');
   };
-
-  const navigateToChat = () => {
-    router.push('/(tabs)/chat');
-  };
-
-  const handleDeleteAccount = async () => {
-    // First confirmation
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action will permanently delete:\n\n• Your profile information\n• All conversation history\n• Your AI companion settings\n• All stored data\n\nThis action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Account',
-          style: 'destructive',
-          onPress: () => {
-            // Second confirmation
-            Alert.alert(
-              'Final Confirmation',
-              'This is your final warning. Deleting your account will permanently remove all your data and cannot be undone. Are you absolutely sure?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Yes, Delete My Account',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      setLoading(true);
-                      console.log('Starting account deletion process...');
-                      
-                      const { data: { user } } = await supabase.auth.getUser();
-                      if (!user) {
-                        Alert.alert('Error', 'User not found');
-                        return;
-                      }
-
-                      // Delete conversation history
-                      console.log('Deleting conversation history...');
-                      const { error: messagesError } = await supabase
-                        .from('messages')
-                        .delete()
-                        .eq('user_id', user.id);
-                      
-                      if (messagesError) {
-                        console.error('Error deleting messages:', messagesError);
-                      }
-
-                      // Delete user profile
-                      console.log('Deleting user profile...');
-                      const { error: profileError } = await supabase
-                        .from('profiles')
-                        .delete()
-                        .eq('id', user.id);
-                      
-                      if (profileError) {
-                        console.error('Error deleting profile:', profileError);
-                      }
-
-                      // Delete auth account
-                      console.log('Deleting auth account...');
-                      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
-                      
-                      if (authError) {
-                        console.error('Error deleting auth account:', authError);
-                        // If admin delete fails, try user-initiated deletion
-                        const { error: userDeleteError } = await supabase.auth.admin.deleteUser(user.id);
-                        if (userDeleteError) {
-                          console.error('User-initiated deletion also failed:', userDeleteError);
-                          Alert.alert(
-                            'Account Deletion Issue',
-                            'We encountered an issue deleting your account. Please contact support at lata@hellopoco.app for assistance.',
-                            [
-                              { text: 'OK', onPress: () => router.replace('/signin') }
-                            ]
-                          );
-                          return;
-                        }
-                      }
-
-                      console.log('Account deletion completed successfully');
-                      Alert.alert(
-                        'Account Deleted',
-                        'Your account has been permanently deleted. Thank you for using PoCo.',
-                        [
-                          { text: 'OK', onPress: () => router.replace('/signin') }
-                        ]
-                      );
-                    } catch (error) {
-                      console.error('Error during account deletion:', error);
-                      Alert.alert(
-                        'Error',
-                        'An error occurred while deleting your account. Please contact support at lata@hellopoco.app for assistance.',
-                        [
-                          { text: 'OK', onPress: () => router.replace('/signin') }
-                        ]
-                      );
-                    } finally {
-                      setLoading(false);
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
-  };
-
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Profile & Settings</Text>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => setIsEditing(!isEditing)}
-          >
-            <Text style={styles.editButtonText}>
-              {isEditing ? 'Cancel' : 'Edit'}
-            </Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Profile Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Information</Text>
-          <View style={styles.profileCard}>
-            <View style={styles.avatarContainer}>
-              <Image
-                source={require('../assets/poco-avatar.png')}
-                style={styles.avatar}
-              />
+          <Text style={styles.sectionTitle}>Profile Information</Text>
+          <View style={styles.settingsCard}>
+            <View style={styles.profileHeader}>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => setIsEditing(!isEditing)}
+              >
+                <Ionicons name={isEditing ? "close" : "create"} size={20} color="#10b981" />
+                <Text style={styles.editButtonText}>
+                  {isEditing ? 'Cancel' : 'Edit'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {isEditing ? (
@@ -340,7 +228,7 @@ export default function ProfileScreen() {
                 <Text style={styles.nameText}>
                   {firstName} {lastName}
                 </Text>
-                <Text style={styles.emailText}>{user.email}</Text>
+                <Text style={styles.emailText}>{user?.email}</Text>
                 <Text style={styles.companionText}>
                   Your AI Companion: <Text style={styles.companionName}>{companionName}</Text>
                 </Text>
@@ -349,13 +237,57 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Privacy Settings */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity style={styles.settingItem} onPress={() => router.push('/chat')}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="chatbubbles" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Chat with {companionName}</Text>
+                  <Text style={styles.settingSubtitle}>Start a conversation with your AI companion</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Medication Management</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity style={styles.settingItem} onPress={() => router.push('/medication-onboarding')}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="medical" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Manage Medications</Text>
+                  <Text style={styles.settingSubtitle}>Add, edit, or remove your medication reminders</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+            
+            <View style={styles.divider} />
+            
+            <TouchableOpacity style={styles.settingItem} onPress={() => router.push('/reminder-choice')}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="alarm" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Reminder Settings</Text>
+                  <Text style={styles.settingSubtitle}>Configure medication and other reminders</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Privacy Settings</Text>
           <View style={styles.settingsCard}>
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
-                <Ionicons name="shield-checkmark" size={24} color="#00B686" style={styles.settingIcon} />
+                <Ionicons name="shield-checkmark" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Data Collection</Text>
                   <Text style={styles.settingSubtitle}>Help improve the app with anonymous usage data</Text>
@@ -364,7 +296,7 @@ export default function ProfileScreen() {
               <Switch
                 value={dataCollection}
                 onValueChange={setDataCollection}
-                trackColor={{ false: '#e5e7eb', true: '#00B686' }}
+                trackColor={{ false: '#e5e7eb', true: '#10b981' }}
                 thumbColor={dataCollection ? '#ffffff' : '#f3f4f6'}
               />
             </View>
@@ -373,7 +305,7 @@ export default function ProfileScreen() {
             
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
-                <Ionicons name="analytics" size={24} color="#00B686" style={styles.settingIcon} />
+                <Ionicons name="analytics" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Analytics</Text>
                   <Text style={styles.settingSubtitle}>Share app usage analytics</Text>
@@ -382,7 +314,7 @@ export default function ProfileScreen() {
               <Switch
                 value={analytics}
                 onValueChange={setAnalytics}
-                trackColor={{ false: '#e5e7eb', true: '#00B686' }}
+                trackColor={{ false: '#e5e7eb', true: '#10b981' }}
                 thumbColor={analytics ? '#ffffff' : '#f3f4f6'}
               />
             </View>
@@ -391,7 +323,7 @@ export default function ProfileScreen() {
             
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
-                <Ionicons name="notifications" size={24} color="#00B686" style={styles.settingIcon} />
+                <Ionicons name="notifications" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Push Notifications</Text>
                   <Text style={styles.settingSubtitle}>Receive important updates and reminders</Text>
@@ -400,78 +332,19 @@ export default function ProfileScreen() {
               <Switch
                 value={notifications}
                 onValueChange={setNotifications}
-                trackColor={{ false: '#e5e7eb', true: '#00B686' }}
+                trackColor={{ false: '#e5e7eb', true: '#10b981' }}
                 thumbColor={notifications ? '#ffffff' : '#f3f4f6'}
               />
             </View>
           </View>
         </View>
 
-        {/* Communication Preferences */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Communication Preferences</Text>
-          <View style={styles.settingsCard}>
-            <TouchableOpacity style={styles.settingItem} onPress={navigateToChat}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="chatbubbles" size={24} color="#00B686" style={styles.settingIcon} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Start Chat</Text>
-                  <Text style={styles.settingSubtitle}>Chat with Pixel, your AI companion</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-            
-            <View style={styles.divider} />
-            
-            <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="settings" size={24} color="#00B686" style={styles.settingIcon} />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Chat Mode</Text>
-                  <Text style={styles.settingSubtitle}>
-                    {user.communication_mode === 'voice' ? 'Voice Mode' : 'Text Mode'}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert(
-                    'Update Communication Mode',
-                    'To change your communication preferences, please complete onboarding again.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Go to Onboarding', onPress: () => router.push('/onboarding') }
-                    ]
-                  );
-                }}
-              >
-                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-              </TouchableOpacity>
-            </View>
-            
-            {user.communication_mode === 'voice' && (
-              <View style={styles.settingItem}>
-                <View style={styles.settingLeft}>
-                  <Ionicons name="mic" size={24} color="#00B686" style={styles.settingIcon} />
-                  <View style={styles.settingText}>
-                    <Text style={styles.settingTitle}>Voice Accent</Text>
-                    <Text style={styles.settingSubtitle}>{user.accent || 'American'}</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Help & Support */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Help & Support</Text>
           <View style={styles.settingsCard}>
             <TouchableOpacity style={styles.settingItem} onPress={openFAQ}>
               <View style={styles.settingLeft}>
-                <Ionicons name="help-circle" size={24} color="#00B686" style={styles.settingIcon} />
+                <Ionicons name="help-circle" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>FAQ</Text>
                   <Text style={styles.settingSubtitle}>Frequently asked questions</Text>
@@ -484,7 +357,7 @@ export default function ProfileScreen() {
             
             <TouchableOpacity style={styles.settingItem} onPress={openSupport}>
               <View style={styles.settingLeft}>
-                <Ionicons name="mail" size={24} color="#00B686" style={styles.settingIcon} />
+                <Ionicons name="mail" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Contact Support</Text>
                   <Text style={styles.settingSubtitle}>Get help from our team</Text>
@@ -497,7 +370,7 @@ export default function ProfileScreen() {
             
             <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('About', 'AI Pocket Companion v1.0.0\n\nYour personal AI companion for meaningful conversations and support.')}>
               <View style={styles.settingLeft}>
-                <Ionicons name="information-circle" size={24} color="#00B686" style={styles.settingIcon} />
+                <Ionicons name="information-circle" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>About</Text>
                   <Text style={styles.settingSubtitle}>App version and information</Text>
@@ -508,77 +381,12 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Memory Management */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Memory & Data</Text>
-          <View style={styles.settingsCard}>
-            <TouchableOpacity 
-              style={styles.settingItem} 
-              onPress={() => {
-                Alert.alert(
-                  'Clear Memory',
-                  'This will delete all conversation history and reset your AI companion\'s memory. This action cannot be undone.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Clear Memory',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await aiService.clearMemory(user.id);
-                          Alert.alert('Success', 'Memory cleared successfully. Your AI companion will start fresh.');
-                        } catch (error) {
-                          console.error('Error clearing memory:', error);
-                          Alert.alert('Error', 'Failed to clear memory. Please try again.');
-                        }
-                      },
-                    },
-                  ]
-                );
-              }}
-            >
-              <View style={styles.settingLeft}>
-                <Ionicons name="trash" size={24} color="#dc2626" style={styles.settingIcon} />
-                <View style={styles.settingText}>
-                  <Text style={[styles.settingTitle, { color: '#dc2626' }]}>Clear Memory</Text>
-                  <Text style={styles.settingSubtitle}>Delete conversation history</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Account Management */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Management</Text>
-          <View style={styles.settingsCard}>
-            <TouchableOpacity 
-              style={[styles.settingItem, styles.deleteAccountItem]} 
-              onPress={handleDeleteAccount}
-              disabled={loading}
-            >
-              <View style={styles.settingLeft}>
-                <Ionicons name="trash" size={24} color="#dc2626" style={styles.settingIcon} />
-                <View style={styles.settingText}>
-                  <Text style={[styles.settingTitle, { color: '#dc2626' }]}>
-                    {loading ? 'Deleting Account...' : 'Delete Account'}
-                  </Text>
-                  <Text style={styles.settingSubtitle}>Permanently delete your account and all data</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Legal */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Legal</Text>
           <View style={styles.settingsCard}>
             <TouchableOpacity style={styles.settingItem} onPress={openPrivacyPolicy}>
               <View style={styles.settingLeft}>
-                <Ionicons name="document-text" size={24} color="#00B686" style={styles.settingIcon} />
+                <Ionicons name="document-text" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Privacy Policy</Text>
                   <Text style={styles.settingSubtitle}>How we protect your data</Text>
@@ -591,7 +399,7 @@ export default function ProfileScreen() {
             
             <TouchableOpacity style={styles.settingItem} onPress={openTermsOfService}>
               <View style={styles.settingLeft}>
-                <Ionicons name="document" size={24} color="#00B686" style={styles.settingIcon} />
+                <Ionicons name="document" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Terms of Service</Text>
                   <Text style={styles.settingSubtitle}>App usage terms and conditions</Text>
@@ -602,16 +410,28 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Sign Out */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account Management</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity 
+              style={[styles.deleteAccountButton, loading && styles.deleteAccountButtonDisabled]} 
+              onPress={handleDeleteAccount}
+              disabled={loading}
+            >
+              <Ionicons name="trash" size={24} color="#ffffff" />
+              <Text style={styles.deleteAccountText}>
+                {loading ? 'Deleting Account...' : 'Delete Account'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Ionicons name="log-out" size={24} color="#dc2626" />
+            <Ionicons name="log-out" size={24} color="#ef4444" />
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.bottomSpacing} />
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -620,51 +440,29 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#f8fafc',
   },
   scrollView: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
+  contentContainer: {
+    paddingBottom: 20,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#ffffff',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  backButton: {
-    padding: 8,
-  },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#00B686',
-  },
-  editButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#00B686',
-    borderRadius: 8,
-  },
-  editButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#1f2937',
+    textAlign: 'center',
   },
   section: {
-    marginTop: 24,
+    marginTop: 20,
     paddingHorizontal: 20,
   },
   sectionTitle: {
@@ -673,24 +471,31 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 12,
   },
-  profileCard: {
+  settingsCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 20,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+  profileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 16,
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  editButtonText: {
+    marginLeft: 4,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10b981',
   },
   profileInfo: {
     alignItems: 'center',
@@ -711,20 +516,19 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   companionName: {
+    color: '#10b981',
     fontWeight: '600',
-    color: '#00B686',
   },
   editForm: {
-    width: '100%',
+    gap: 16,
   },
   inputGroup: {
-    marginBottom: 16,
+    gap: 8,
   },
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
@@ -737,7 +541,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   saveButton: {
-    backgroundColor: '#00B686',
+    backgroundColor: '#10b981',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
@@ -751,37 +555,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  settingsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  settingIcon: {
-    marginRight: 12,
-  },
   settingText: {
+    marginLeft: 12,
     flex: 1,
   },
   settingTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1f2937',
+    fontWeight: '600',
+    color: '#374151',
   },
   settingSubtitle: {
     fontSize: 14,
@@ -791,35 +583,39 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: '#e5e7eb',
-    marginHorizontal: 20,
+    marginVertical: 8,
+  },
+  deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  deleteAccountButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  deleteAccountText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 8,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    gap: 8,
   },
   signOutText: {
+    color: '#ef4444',
     fontSize: 16,
     fontWeight: '600',
-    color: '#dc2626',
-    marginLeft: 8,
-  },
-  bottomSpacing: {
-    height: 40,
-  },
-  deleteAccountItem: {
-    borderColor: '#fecaca',
-    borderWidth: 1,
-    borderRadius: 8,
-    marginHorizontal: 4,
-    marginVertical: 4,
   },
 });
