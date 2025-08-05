@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'expo-router';
+import { AIService } from '../lib/aiService';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
@@ -91,12 +92,13 @@ export default function ChatScreen() {
     setIsLoading(true);
 
     try {
-      // Simple AI response for now
-      const response = getSimpleAIResponse(inputText.trim(), companionName, userName);
+      // Use actual AI service
+      console.log('🤖 Calling AI service...');
+      const response = await AIService.sendMessage(inputText.trim(), messages, companionName);
       
       const aiMessage = {
         id: Date.now() + 1,
-        text: response,
+        text: response.content || response,
         sender: 'ai',
         timestamp: new Date().toISOString(),
       };
@@ -116,33 +118,7 @@ export default function ChatScreen() {
     }
   };
 
-  const getSimpleAIResponse = (message, companionName, userName) => {
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-      return `Hello ${userName || 'there'}! How can I help you today?`;
-    }
-    
-    if (lowerMessage.includes('medication') || lowerMessage.includes('medicine') || lowerMessage.includes('pill')) {
-      return `I can help you with medication reminders! You can set up your medications in the settings. Would you like me to remind you about your medications?`;
-    }
-    
-    if (lowerMessage.includes('reminder') || lowerMessage.includes('remind')) {
-      return `I'm here to help with reminders! You can set up medication reminders, appointments, and other important tasks. What would you like to be reminded about?`;
-    }
-    
-    if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
-      return `I'm ${companionName}, your AI assistant! I can help you with:
-• Medication reminders
-• General conversation and support
-• Task organization
-• Information and questions
 
-What would you like to know more about?`;
-    }
-    
-    return `Thanks for your message! I'm here to help you stay organized and on track. Is there anything specific you'd like assistance with?`;
-  };
 
   const renderMessage = ({ item }) => (
     <View style={[styles.messageContainer, item.sender === 'user' ? styles.userMessage : styles.aiMessage]}>
