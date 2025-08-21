@@ -52,6 +52,8 @@ export default {
       // Inject environment variables
       openaiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
       geminiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
+      elevenLabsKey: process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY,
+      elevenLabsVoiceId: process.env.EXPO_PUBLIC_ELEVENLABS_VOICE_ID,
       enableAgents: process.env.EXPO_PUBLIC_ENABLE_AGENTS,
       enableSupervisorAgent: process.env.EXPO_PUBLIC_ENABLE_SUPERVISOR_AGENT,
       enableHealthAgent: process.env.EXPO_PUBLIC_ENABLE_HEALTH_AGENT,

@@ -1,51 +1,67 @@
-import * as React from 'react';
-import { View, Image, ActivityIndicator, Alert } from 'react-native';
-import { Text, Button, Provider as PaperProvider } from 'react-native-paper';
-import { Link, useRouter } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Alert,
+  SafeAreaView,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 
 export default function HomeScreen() {
-  const [companionName, setCompanionName] = React.useState('');
-  const [userName, setUserName] = React.useState('');
-  const [loading, setLoading] = React.useState(true);
+  const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
   const router = useRouter();
 
-  React.useEffect(() => {
-    const checkAuthAndFetchProfile = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
+  useEffect(() => {
+    checkAuthAndProfile();
+  }, []);
+
+  const checkAuthAndProfile = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      if (!authUser) {
           router.replace('/signin');
         return;
       }
 
+      setUser(authUser);
+
+      // Check if user has completed onboarding
         const { data: profile } = await supabase
           .from('profiles')
-          .select('first_name, companion_name')
-          .eq('id', user.id);
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
         
-        const isOnboarded = !!(profile && profile.length > 0 && profile[0].first_name && profile[0].companion_name);
-        
-        if (!isOnboarded) {
+      if (!profile || !profile.first_name || !profile.companion_name) {
           router.replace('/onboarding');
           return;
         }
         
-        if (profile && profile.length > 0) {
-          setCompanionName(profile[0].companion_name || '');
-          setUserName(profile[0].first_name || '');
-        }
+      setUserProfile(profile);
       } catch (error) {
-        console.log('Error checking auth:', error);
+      console.error('Error checking auth:', error);
         router.replace('/signin');
       } finally {
       setLoading(false);
       }
     };
 
-    checkAuthAndFetchProfile();
-  }, []);
+  const handleStartChat = () => {
+    router.push('/chat');
+  };
+
+  const handleProfileSettings = () => {
+    router.push('/profile');
+  };
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -70,81 +86,184 @@ export default function HomeScreen() {
     );
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <PaperProvider>
-      <View style={{ flex: 1, backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerSpacer} />
+          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+            <Ionicons name="log-out-outline" size={24} color="#6b7280" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.avatarSection}>
         <Image
           source={require('../assets/poco-avatar.png')}
-          style={{ width: 160, height: 160, marginBottom: 16 }}
-        />
-        {loading ? (
-          <ActivityIndicator size="large" color="#00B686" style={{ marginBottom: 16 }} />
-        ) : (
-          <Text style={{
-            fontSize: 24,
-            fontWeight: 'bold',
-            color: '#00B686',
-            textAlign: 'center',
-            marginBottom: 8,
-          }}>
-            Hi {userName}, I'm {companionName}! 👋
+            style={styles.avatar}
+          />
+          <Text style={styles.userName}>
+            {userProfile?.first_name || 'User'}
           </Text>
-        )}
-        <Text style={{
-          fontSize: 16,
-          color: '#333',
-          textAlign: 'center',
-          marginBottom: 24,
-        }}>
-          How can I help you today?
+          <Text style={styles.companionText}>
+            Your companion: <Text style={styles.companionName}>{userProfile?.companion_name || 'Pixel'}</Text>
+          </Text>
+        </View>
+
+        <View style={styles.optionsContainer}>
+          <TouchableOpacity style={styles.optionCard} onPress={handleStartChat}>
+            <View style={styles.optionIcon}>
+              <Ionicons name="chatbubbles" size={32} color="#10b981" />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={styles.optionTitle}>Start Chatting</Text>
+              <Text style={styles.optionDescription}>
+                Chat with {userProfile?.companion_name || 'Pixel'} about anything
         </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
+          </TouchableOpacity>
 
-        <Link href="/chat" asChild>
-          <Button
-            mode="contained"
-            style={{ backgroundColor: '#00B686', marginBottom: 12, width: 220 }}
-            labelStyle={{ fontWeight: 'bold', color: 'white', fontSize: 18 }}
-          >
-            Start Chatting
-          </Button>
-        </Link>
-        <Link href="/profile" asChild>
-          <Button
-            mode="outlined"
-            style={{ borderColor: '#00B686', width: 220, marginBottom: 12 }}
-            labelStyle={{ color: '#00B686', fontWeight: 'bold', fontSize: 16 }}
-          >
-            Profile & Settings
-          </Button>
-        </Link>
-        <Button
-          mode="text"
-          onPress={handleSignOut}
-          style={{ marginTop: 8 }}
-          labelStyle={{ color: '#666', fontSize: 14 }}
-        >
-          Sign Out
-        </Button>
+          <TouchableOpacity style={styles.optionCard} onPress={handleProfileSettings}>
+            <View style={styles.optionIcon}>
+              <Ionicons name="person-circle" size={32} color="#10b981" />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={styles.optionTitle}>Profile & Settings</Text>
+              <Text style={styles.optionDescription}>
+                Manage your profile and app preferences
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
+          </TouchableOpacity>
+        </View>
 
-        {/* Disclaimer - Moved below sign out */}
-        <View style={{
-          backgroundColor: '#f8f9fa',
-          borderColor: '#e5e7eb',
-          borderWidth: 1,
-          borderRadius: 8,
-          padding: 12,
-          marginTop: 16,
-        }}>
-          <Text style={{
-            fontSize: 11,
-            color: '#9ca3af',
-            textAlign: 'center',
-            lineHeight: 14,
-          }}>
-            ⭐ AI companion for general assistance. For professional advice, consult qualified experts.
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            Your AI companion is ready to help!
           </Text>
         </View>
       </View>
-    </PaperProvider>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  headerSpacer: {
+    flex: 1,
+  },
+  signOutButton: {
+    padding: 8,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 40,
+  },
+  avatar: {
+    width: 300,
+    height: 300,
+    resizeMode: 'contain',
+    marginBottom: 16,
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  companionText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  companionName: {
+    color: '#10b981',
+    fontWeight: '600',
+  },
+  optionsContainer: {
+    flex: 1,
+  },
+  optionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  optionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#f0fdf4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  optionContent: {
+    flex: 1,
+  },
+  optionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  optionDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  footer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+});

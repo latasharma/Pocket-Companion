@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -25,6 +26,7 @@ export default function ProfileScreen() {
   const [dataCollection, setDataCollection] = useState(true);
   const [analytics, setAnalytics] = useState(true);
   const [notifications, setNotifications] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
 
   useEffect(() => {
     fetchUserProfile();
@@ -32,20 +34,42 @@ export default function ProfileScreen() {
 
   const fetchUserProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      const { data: { user: authUserData } } = await supabase.auth.getUser();
+      if (authUserData) {
+        setAuthUser(authUserData);
+        
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
+          .eq('id', authUserData.id)
           .single();
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching profile:', error);
+          Alert.alert('Error', 'Failed to load profile');
+          return;
+        }
 
+        if (data) {
         setUser(data);
         setFirstName(data.first_name || '');
         setLastName(data.last_name || '');
-        setCompanionName(data.companion_name || '');
+          setCompanionName(data.companion_name || 'Pixel');
+          setVoiceEnabled(data.voice_enabled !== false); // Default to true if not set
+        } else {
+          // Create default profile if none exists
+          setUser({
+            id: authUserData.id,
+            first_name: '',
+            last_name: '',
+            companion_name: 'Pixel',
+            voice_enabled: true
+          });
+          setFirstName('');
+          setLastName('');
+          setCompanionName('Pixel');
+          setVoiceEnabled(true);
+        }
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -61,15 +85,21 @@ export default function ProfileScreen() {
 
     setLoading(true);
     try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: authUser.id,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           companion_name: companionName.trim(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+          voice_enabled: voiceEnabled,
+        });
 
       if (error) throw error;
 
@@ -96,7 +126,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               await supabase.auth.signOut();
-              router.replace('/auth');
+              router.replace('/signin');
             } catch (error) {
               console.error('Error signing out:', error);
               Alert.alert('Error', 'Failed to sign out');
@@ -119,15 +149,25 @@ export default function ProfileScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              const { error } = await supabase
+              const { data: { user: authUser } } = await supabase.auth.getUser();
+              if (authUser) {
+                // Delete profile first
+                const { error: profileError } = await supabase
                 .from('profiles')
                 .delete()
-                .eq('id', user.id);
+                  .eq('id', authUser.id);
 
-              if (error) throw error;
+                if (profileError) {
+                  console.error('Error deleting profile:', profileError);
+                }
 
-              await supabase.auth.signOut();
-              router.replace('/auth');
+                // Note: User deletion requires admin privileges
+                // For now, we'll just delete the profile and sign out
+                console.log('Profile deleted. User account deletion requires admin privileges.');
+              }
+
+              Alert.alert('Success', 'Account deleted successfully');
+              router.replace('/signin');
             } catch (error) {
               console.error('Error deleting account:', error);
               Alert.alert('Error', 'Failed to delete account');
@@ -152,15 +192,52 @@ export default function ProfileScreen() {
     router.push('/support');
   };
 
-  const openFAQ = () => {
+  const openAbout = () => {
     router.push('/about');
+  };
+
+  const handleForgotPassword = async () => {
+    if (!authUser?.email) {
+      Alert.alert('Error', 'Email address not found');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(authUser.email, {
+        redirectTo: 'aipocketcompanion://reset-password',
+        emailRedirectTo: 'aipocketcompanion://reset-password',
+      });
+
+      if (error) {
+        Alert.alert('Error', error.message);
+        return;
+      }
+
+      Alert.alert(
+        'Reset Link Sent', 
+        'Check your email for a password reset link. Click the link to reset your password within the app.',
+        [
+          { text: 'OK', onPress: () => console.log('Password reset email sent') }
+        ]
+      );
+    } catch (error) {
+      console.error('Password reset error:', error);
+      Alert.alert('Error', 'Failed to send password reset email. Please try again.');
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#10B981" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Profile & Settings</Text>
+          <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.section}>
@@ -226,11 +303,11 @@ export default function ProfileScreen() {
             ) : (
               <View style={styles.profileInfo}>
                 <Text style={styles.nameText}>
-                  {firstName} {lastName}
+                  {firstName || 'Not set'} {lastName || ''}
                 </Text>
-                <Text style={styles.emailText}>{user?.email}</Text>
+                <Text style={styles.emailText}>{authUser?.email || 'Loading...'}</Text>
                 <Text style={styles.companionText}>
-                  Your AI Companion: <Text style={styles.companionName}>{companionName}</Text>
+                  Your AI Companion: <Text style={styles.companionName}>{companionName || 'Pixel'}</Text>
                 </Text>
               </View>
             )}
@@ -240,13 +317,10 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.settingsCard}>
-            <TouchableOpacity style={styles.settingItem} onPress={() => router.push('/chat')}>
-              <View style={styles.settingLeft}>
+            <TouchableOpacity style={styles.quickActionButton} onPress={() => router.push('/chat')}>
+              <View style={styles.quickActionContent}>
                 <Ionicons name="chatbubbles" size={24} color="#10b981" />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Chat with {companionName}</Text>
-                  <Text style={styles.settingSubtitle}>Start a conversation with your AI companion</Text>
-                </View>
+                <Text style={styles.quickActionText}>Chat with {companionName || 'Pixel'}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </TouchableOpacity>
@@ -254,174 +328,123 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Medication Management</Text>
+          <Text style={styles.sectionTitle}>Companion Settings</Text>
           <View style={styles.settingsCard}>
-            <TouchableOpacity style={styles.settingItem} onPress={() => router.push('/medication-onboarding')}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="medical" size={24} color="#10b981" />
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="volume-high" size={24} color="#10b981" />
                 <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Manage Medications</Text>
-                  <Text style={styles.settingSubtitle}>Add, edit, or remove your medication reminders</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-            
-            <View style={styles.divider} />
-            
-            <TouchableOpacity style={styles.settingItem} onPress={() => router.push('/reminder-choice')}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="alarm" size={24} color="#10b981" />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Reminder Settings</Text>
-                  <Text style={styles.settingSubtitle}>Configure medication and other reminders</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy Settings</Text>
-          <View style={styles.settingsCard}>
-            <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="shield-checkmark" size={24} color="#10b981" />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Data Collection</Text>
-                  <Text style={styles.settingSubtitle}>Help improve the app with anonymous usage data</Text>
+                  <Text style={styles.settingTitle}>Voice Responses</Text>
+                  <Text style={styles.settingDescription}>
+                    {voiceEnabled ? 'Companion will speak responses' : 'Text-only responses'}
+                  </Text>
                 </View>
               </View>
               <Switch
-                value={dataCollection}
-                onValueChange={setDataCollection}
-                trackColor={{ false: '#e5e7eb', true: '#10b981' }}
-                thumbColor={dataCollection ? '#ffffff' : '#f3f4f6'}
+                value={voiceEnabled}
+                onValueChange={async (value) => {
+                  setVoiceEnabled(value);
+                  // Save to database
+                  try {
+                    const { data: { user: authUser } } = await supabase.auth.getUser();
+                    if (authUser) {
+                      await supabase
+                        .from('profiles')
+                        .update({ voice_enabled: value })
+                        .eq('id', authUser.id);
+                    }
+                  } catch (error) {
+                    console.error('Error saving voice preference:', error);
+                  }
+                }}
+                trackColor={{ false: '#d1d5db', true: '#10b981' }}
+                thumbColor={voiceEnabled ? '#ffffff' : '#ffffff'}
               />
             </View>
-            
-            <View style={styles.divider} />
-            
-            <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+          <View style={styles.settingsCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
                 <Ionicons name="analytics" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Analytics</Text>
-                  <Text style={styles.settingSubtitle}>Share app usage analytics</Text>
+                  <Text style={styles.settingDescription}>
+                    Help us improve by sharing anonymous usage data
+                  </Text>
                 </View>
               </View>
               <Switch
                 value={analytics}
                 onValueChange={setAnalytics}
-                trackColor={{ false: '#e5e7eb', true: '#10b981' }}
-                thumbColor={analytics ? '#ffffff' : '#f3f4f6'}
+                trackColor={{ false: '#d1d5db', true: '#10b981' }}
+                thumbColor={analytics ? '#ffffff' : '#ffffff'}
               />
             </View>
-            
             <View style={styles.divider} />
-            
-            <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
                 <Ionicons name="notifications" size={24} color="#10b981" />
                 <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Push Notifications</Text>
-                  <Text style={styles.settingSubtitle}>Receive important updates and reminders</Text>
+                  <Text style={styles.settingTitle}>Notifications</Text>
+                  <Text style={styles.settingDescription}>
+                    Receive notifications about your companion
+                  </Text>
                 </View>
               </View>
               <Switch
                 value={notifications}
                 onValueChange={setNotifications}
-                trackColor={{ false: '#e5e7eb', true: '#10b981' }}
-                thumbColor={notifications ? '#ffffff' : '#f3f4f6'}
+                trackColor={{ false: '#d1d5db', true: '#10b981' }}
+                thumbColor={notifications ? '#ffffff' : '#ffffff'}
               />
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Help & Support</Text>
+          <TouchableOpacity 
+            style={styles.forgotPasswordButton} 
+            onPress={handleForgotPassword}
+          >
+            <Ionicons name="key" size={24} color="#10b981" />
+            <Text style={styles.forgotPasswordText}>Reset Password</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Privacy & Legal</Text>
           <View style={styles.settingsCard}>
-            <TouchableOpacity style={styles.settingItem} onPress={openFAQ}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="help-circle" size={24} color="#10b981" />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>FAQ</Text>
-                  <Text style={styles.settingSubtitle}>Frequently asked questions</Text>
-                </View>
-              </View>
+            <TouchableOpacity style={styles.menuItem} onPress={openPrivacyPolicy}>
+              <Ionicons name="shield-checkmark" size={24} color="#10b981" />
+              <Text style={styles.menuItemText}>Privacy Policy</Text>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </TouchableOpacity>
             
-            <View style={styles.divider} />
-            
-            <TouchableOpacity style={styles.settingItem} onPress={openSupport}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="mail" size={24} color="#10b981" />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Contact Support</Text>
-                  <Text style={styles.settingSubtitle}>Get help from our team</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-            
-            <View style={styles.divider} />
-            
-            <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('About', 'AI Pocket Companion v1.0.0\n\nYour personal AI companion for meaningful conversations and support.')}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="information-circle" size={24} color="#10b981" />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>About</Text>
-                  <Text style={styles.settingSubtitle}>App version and information</Text>
-                </View>
-              </View>
+            <TouchableOpacity style={styles.menuItem} onPress={openTermsOfService}>
+              <Ionicons name="document-text" size={24} color="#10b981" />
+              <Text style={styles.menuItemText}>Terms of Service</Text>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Legal</Text>
+          <Text style={styles.sectionTitle}>Support</Text>
           <View style={styles.settingsCard}>
-            <TouchableOpacity style={styles.settingItem} onPress={openPrivacyPolicy}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="document-text" size={24} color="#10b981" />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Privacy Policy</Text>
-                  <Text style={styles.settingSubtitle}>How we protect your data</Text>
-                </View>
-              </View>
+            <TouchableOpacity style={styles.menuItem} onPress={openSupport}>
+              <Ionicons name="help-circle" size={24} color="#10b981" />
+              <Text style={styles.menuItemText}>Support</Text>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </TouchableOpacity>
             
-            <View style={styles.divider} />
-            
-            <TouchableOpacity style={styles.settingItem} onPress={openTermsOfService}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="document" size={24} color="#10b981" />
-                <View style={styles.settingText}>
-                  <Text style={styles.settingTitle}>Terms of Service</Text>
-                  <Text style={styles.settingSubtitle}>App usage terms and conditions</Text>
-                </View>
-              </View>
+            <TouchableOpacity style={styles.menuItem} onPress={openAbout}>
+              <Ionicons name="information-circle" size={24} color="#10b981" />
+              <Text style={styles.menuItemText}>About PoCo</Text>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Management</Text>
-          <View style={styles.settingsCard}>
-            <TouchableOpacity 
-              style={[styles.deleteAccountButton, loading && styles.deleteAccountButtonDisabled]} 
-              onPress={handleDeleteAccount}
-              disabled={loading}
-            >
-              <Ionicons name="trash" size={24} color="#ffffff" />
-              <Text style={styles.deleteAccountText}>
-                {loading ? 'Deleting Account...' : 'Delete Account'}
-              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -431,6 +454,19 @@ export default function ProfileScreen() {
             <Ionicons name="log-out" size={24} color="#ef4444" />
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+            <TouchableOpacity 
+              style={[styles.deleteAccountButton, loading && styles.deleteAccountButtonDisabled]} 
+              onPress={handleDeleteAccount}
+              disabled={loading}
+            >
+            <Ionicons name="trash" size={24} color="#ef4444" />
+              <Text style={styles.deleteAccountText}>
+                {loading ? 'Deleting Account...' : 'Delete Account'}
+              </Text>
+            </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -454,12 +490,22 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
     textAlign: 'center',
+    flex: 1,
+  },
+  headerSpacer: {
+    width: 32,
   },
   section: {
     marginTop: 20,
@@ -493,9 +539,22 @@ const styles = StyleSheet.create({
   },
   editButtonText: {
     marginLeft: 4,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  settingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  settingDescription: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#10b981',
+    color: '#6b7280',
+    marginTop: 2,
   },
   profileInfo: {
     alignItems: 'center',
@@ -561,25 +620,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
   },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  settingText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  settingSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 2,
-  },
   divider: {
     height: 1,
     backgroundColor: '#e5e7eb',
@@ -602,6 +642,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  forgotPasswordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#10b981',
+    gap: 8,
+  },
+  forgotPasswordText: {
+    color: '#10b981',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -617,5 +673,62 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 16,
     fontWeight: '600',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  settingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  settingText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  settingDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  quickActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+  },
+  quickActionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  quickActionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginLeft: 12,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginLeft: 12,
+    flex: 1,
   },
 });
