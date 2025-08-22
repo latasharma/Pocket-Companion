@@ -27,6 +27,7 @@ export default function ProfileScreen() {
   const [analytics, setAnalytics] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceInputEnabled, setVoiceInputEnabled] = useState(true);
 
   useEffect(() => {
     fetchUserProfile();
@@ -56,6 +57,7 @@ export default function ProfileScreen() {
         setLastName(data.last_name || '');
           setCompanionName(data.companion_name || 'Pixel');
           setVoiceEnabled(data.voice_enabled !== false); // Default to true if not set
+          setVoiceInputEnabled(data.voice_input_enabled !== false); // Default to true if not set
         } else {
           // Create default profile if none exists
           setUser({
@@ -69,6 +71,7 @@ export default function ProfileScreen() {
           setLastName('');
           setCompanionName('Pixel');
           setVoiceEnabled(true);
+          setVoiceInputEnabled(true);
         }
       }
     } catch (error) {
@@ -361,6 +364,38 @@ export default function ProfileScreen() {
                 thumbColor={voiceEnabled ? '#ffffff' : '#ffffff'}
               />
             </View>
+            <View style={styles.divider} />
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="mic" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Voice Input</Text>
+                  <Text style={styles.settingDescription}>
+                    {voiceInputEnabled ? 'Speak to your companion' : 'Text input only'}
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={voiceInputEnabled}
+                onValueChange={async (value) => {
+                  setVoiceInputEnabled(value);
+                  // Save to database
+                  try {
+                    const { data: { user: authUser } } = await supabase.auth.getUser();
+                    if (authUser) {
+                      await supabase
+                        .from('profiles')
+                        .update({ voice_input_enabled: value })
+                        .eq('id', authUser.id);
+                    }
+                  } catch (error) {
+                    console.error('Error saving voice input preference:', error);
+                  }
+                }}
+                trackColor={{ false: '#d1d5db', true: '#10b981' }}
+                thumbColor={voiceInputEnabled ? '#ffffff' : '#ffffff'}
+              />
+            </View>
           </View>
         </View>
 
@@ -466,7 +501,7 @@ export default function ProfileScreen() {
               <Text style={styles.deleteAccountText}>
                 {loading ? 'Deleting Account...' : 'Delete Account'}
               </Text>
-            </TouchableOpacity>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
