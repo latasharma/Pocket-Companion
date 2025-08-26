@@ -68,26 +68,31 @@ export default function VoiceSelector({ onVoiceChange }) {
     }
   };
 
-  const handleVoiceSelect = async (voice) => {
-    setIsLoading(true);
-    setSelectedVoice(voice);
-    
-    try {
-      await saveVoiceSettings(voice, isEnabled);
-      
-      // Show preview
-      Alert.alert(
-        'Voice Changed',
-        `You've selected ${VOICE_OPTIONS[voice].name}. ${VOICE_OPTIONS[voice].preview}`,
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('Error changing voice:', error);
-      Alert.alert('Error', 'Failed to change voice. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+                const handleVoiceSelect = async (voice) => {
+                setIsLoading(true);
+                setSelectedVoice(voice);
+
+                try {
+                  await saveVoiceSettings(voice, isEnabled);
+                  
+                  // Update VoiceService immediately
+                  if (onVoiceChange) {
+                    await onVoiceChange(voice, isEnabled);
+                  }
+
+                  // Show preview
+                  Alert.alert(
+                    'Voice Changed',
+                    `You've selected ${VOICE_OPTIONS[voice].name}. ${VOICE_OPTIONS[voice].preview}`,
+                    [{ text: 'OK' }]
+                  );
+                } catch (error) {
+                  console.error('Error changing voice:', error);
+                  Alert.alert('Error', 'Failed to change voice. Please try again.');
+                } finally {
+                  setIsLoading(false);
+                }
+              };
 
   const handleToggleVoice = async (enabled) => {
     setIsEnabled(enabled);
