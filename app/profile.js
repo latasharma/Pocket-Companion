@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { router } from 'expo-router';
+import VoiceSelector from '../components/VoiceSelector';
+import { VoiceService } from '../lib/voiceService';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState(null);
@@ -58,6 +60,11 @@ export default function ProfileScreen() {
           setCompanionName(data.companion_name || 'Pixel');
           setVoiceEnabled(data.voice_enabled !== false); // Default to true if not set
           setVoiceInputEnabled(data.voice_input_enabled !== false); // Default to true if not set
+          
+          // Set voice type if available
+          if (data.voice_type) {
+            VoiceService.setVoiceType(data.voice_type);
+          }
         } else {
           // Create default profile if none exists
           setUser({
@@ -65,13 +72,17 @@ export default function ProfileScreen() {
             first_name: '',
             last_name: '',
             companion_name: 'Pixel',
-            voice_enabled: true
+            voice_enabled: true,
+            voice_type: 'female'
           });
           setFirstName('');
           setLastName('');
           setCompanionName('Pixel');
           setVoiceEnabled(true);
           setVoiceInputEnabled(true);
+          
+          // Set default voice type
+          VoiceService.setVoiceType('female');
         }
       }
     } catch (error) {
@@ -226,6 +237,31 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error('Password reset error:', error);
       Alert.alert('Error', 'Failed to send password reset email. Please try again.');
+    }
+  };
+
+  const handleVoiceChange = async (voiceType, enabled) => {
+    try {
+      // Update voice service
+      VoiceService.setVoiceType(voiceType);
+      setVoiceEnabled(enabled);
+      
+      // Save to database
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: authUser.id,
+            voice_enabled: enabled,
+            voice_type: voiceType
+          });
+      }
+      
+      console.log(`Voice changed to: ${voiceType}, enabled: ${enabled}`);
+    } catch (error) {
+      console.error('Error saving voice settings:', error);
+      Alert.alert('Error', 'Failed to save voice settings');
     }
   };
 
@@ -400,6 +436,15 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Voice Settings</Text>
+          <View style={styles.settingsCard}>
+            <VoiceSelector 
+              onVoiceChange={handleVoiceChange}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Settings</Text>
           <View style={styles.settingsCard}>
             <View style={styles.settingRow}>
@@ -439,6 +484,8 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+
 
         <View style={styles.section}>
           <TouchableOpacity 
