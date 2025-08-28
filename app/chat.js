@@ -23,6 +23,8 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState(''); // 'preparing', 'speaking', or ''
   const [companionName, setCompanionName] = useState('Pixel');
   const [userProfile, setUserProfile] = useState(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -357,10 +359,35 @@ export default function ChatScreen() {
         timestamp: new Date().toISOString(),
       };
 
-      // Speak the AI response if voice is enabled in profile
+      // Start voice synthesis immediately after getting AI response
       console.log('Voice enabled in chat:', voiceEnabled);
       if (voiceEnabled) {
-        VoiceService.speak(aiMessage.text);
+        // Show speaking indicator immediately to indicate voice is being prepared
+        setIsSpeaking(true);
+        setVoiceStatus('preparing');
+        
+        // Set up callbacks for voice start/end
+        VoiceService.onVoiceStart = () => {
+          console.log('🎵 Voice started playing - changing indicator text');
+          setVoiceStatus('speaking');
+        };
+        VoiceService.onVoiceEnd = () => {
+          console.log('🎵 Voice ended - hiding speaking indicator');
+          setIsSpeaking(false);
+          setVoiceStatus('');
+        };
+        
+        // Start voice synthesis
+        VoiceService.speak(aiMessage.text)
+          .then(() => {
+            console.log('Voice synthesis completed successfully');
+          })
+          .catch((error) => {
+            console.error('Voice synthesis failed:', error);
+            setIsSpeaking(false); // Hide indicator if synthesis fails
+            setVoiceStatus('');
+          });
+        console.log('Voice synthesis started immediately for response length:', aiMessage.text.length);
       }
 
       const updatedMessages = [...newMessages, aiMessage];
@@ -554,6 +581,14 @@ export default function ChatScreen() {
             <Text style={styles.typingText}>{companionName} is typing...</Text>
           </View>
         )}
+        
+        {isSpeaking && (
+          <View style={styles.speakingIndicator}>
+            <Text style={styles.speakingText}>
+              {companionName} is {voiceStatus === 'speaking' ? 'speaking...' : 'preparing voice...'}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.inputContainer}>
           <TouchableOpacity
@@ -685,6 +720,15 @@ const styles = StyleSheet.create({
   typingText: {
     fontSize: 14,
     color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  speakingIndicator: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  speakingText: {
+    fontSize: 14,
+    color: '#10B981',
     fontStyle: 'italic',
   },
   inputContainer: {
