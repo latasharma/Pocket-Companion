@@ -149,6 +149,8 @@ npx expo build
 - **Intuitive UI**: Press-and-hold for voice, clear visual feedback
 - **Accessibility**: Designed for elderly users with clear, simple interface
 
+
+
 ---
 
 **Last Updated**: August 2024  
