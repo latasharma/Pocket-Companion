@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 export default {
   expo: {
-    name: 'ai-pocket-companion',
+    name: 'POCO',
     slug: 'ai-pocket-companion',
     version: '1.0.0',
     orientation: 'portrait',
@@ -13,8 +13,16 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.hellopoco.poco',
+      buildNumber: '17',
       infoPlist: {
-        ITSAppUsesNonExemptEncryption: false
+        ITSAppUsesNonExemptEncryption: false,
+        NSPhotoLibraryUsageDescription: "POCO needs access to your photo library to let you upload profile pictures and share images in conversations.",
+        NSCameraUsageDescription: "POCO needs access to your camera to let you take photos for your profile and share images in conversations.",
+        NSMicrophoneUsageDescription: "POCO needs access to your microphone to enable voice conversations with your AI companion.",
+        NSSpeechRecognitionUsageDescription: "POCO uses speech recognition to convert your voice messages into text for better AI understanding and conversation flow.",
+        NSLocationWhenInUseUsageDescription: "POCO uses your location to help you connect with nearby users who share your interests.",
+        NSContactsUsageDescription: "POCO may access your contacts to help you find friends who are also using the app.",
+        NSPhotoLibraryAddUsageDescription: "POCO needs access to save photos to your photo library when you share images in conversations."
       }
     },
     android: {
@@ -39,7 +47,15 @@ export default {
           resizeMode: 'contain',
           backgroundColor: '#f0fdf4'
         }
-      ]
+      ],
+      [
+        'expo-av',
+        {
+          microphonePermission: 'POCO needs access to your microphone to enable voice conversations with your AI companion.'
+        }
+      ],
+      'expo-build-properties',
+      
     ],
     experiments: {
       typedRoutes: true
