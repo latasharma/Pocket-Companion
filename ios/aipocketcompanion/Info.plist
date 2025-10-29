@@ -53,6 +53,20 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>POCO needs access to your photo library to let you upload profile pictures and share images in conversations.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>POCO needs access to save photos to your photo library when you share images in conversations.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>POCO needs access to your camera to let you take photos for your profile and share images in conversations.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>POCO needs access to your microphone to enable voice conversations with your AI companion.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>POCO uses speech recognition to convert your voice messages into text for better AI understanding and conversation flow.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>POCO uses your location to help you connect with nearby users who share your interests.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>POCO may access your contacts to help you find friends who are also using the app.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
