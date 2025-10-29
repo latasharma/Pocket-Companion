@@ -53,9 +53,7 @@ export default {
         {
           microphonePermission: 'POCO needs access to your microphone to enable voice conversations with your AI companion.'
         }
-      ],
-      'expo-build-properties',
-      
+      ]
     ],
     experiments: {
       typedRoutes: true
