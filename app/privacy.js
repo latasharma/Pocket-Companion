@@ -73,7 +73,7 @@ export default function PrivacyPolicyScreen() {
           <Text style={styles.text}>
             If you have any questions about this Privacy Policy, please contact us at:
           </Text>
-          <Text style={styles.contact}>support@poco.ai</Text>
+          <Text style={styles.contact}>lata@hellopoco.app</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

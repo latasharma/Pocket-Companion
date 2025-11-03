@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 
 export default function SupportScreen() {
   const handleEmailSupport = () => {
-    Linking.openURL('mailto:support@poco.ai?subject=PoCo Support Request');
+    Linking.openURL('mailto:lata@hellopoco.app?subject=PoCo Support Request');
   };
 
   return (

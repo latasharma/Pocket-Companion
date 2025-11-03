@@ -13,7 +13,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.hellopoco.poco',
-      buildNumber: '27',
+      buildNumber: '28',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSPhotoLibraryUsageDescription: "POCO needs access to your photo library to let you upload profile pictures and share images in conversations.",

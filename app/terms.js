@@ -86,7 +86,7 @@ export default function TermsOfServiceScreen() {
           <Text style={styles.text}>
             For questions about these Terms of Service, contact us at:
           </Text>
-          <Text style={styles.contact}>support@poco.ai</Text>
+          <Text style={styles.contact}>lata@hellopoco.app</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
