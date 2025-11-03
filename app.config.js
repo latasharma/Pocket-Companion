@@ -6,14 +6,14 @@ export default {
     slug: 'ai-pocket-companion',
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './assets/images/icon.png',
+    icon: './assets/images/icon.flat.png',
     scheme: 'aipocketcompanion',
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.hellopoco.poco',
-      buildNumber: '17',
+      buildNumber: '27',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSPhotoLibraryUsageDescription: "POCO needs access to your photo library to let you upload profile pictures and share images in conversations.",
