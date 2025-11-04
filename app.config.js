@@ -9,7 +9,7 @@ export default {
     icon: './assets/images/icon.flat.png',
     scheme: 'aipocketcompanion',
     userInterfaceStyle: 'automatic',
-    newArchEnabled: true,
+    newArchEnabled: false,
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.hellopoco.poco',
