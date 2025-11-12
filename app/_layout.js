@@ -1,55 +1,75 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { Linking, ErrorUtils } from "react-native";
-import { supabase } from "../lib/supabase";
 import { useRouter } from "expo-router";
+import { supabase } from "../lib/supabase";
 import { DemoProvider } from "../lib/demoContext";
 
 // Global error handler for uncaught exceptions
-// Check if ErrorUtils is available before using it
-if (ErrorUtils && typeof ErrorUtils.getGlobalHandler === 'function') {
-  try {
-    const originalHandler = ErrorUtils.getGlobalHandler();
-    ErrorUtils.setGlobalHandler((error, isFatal) => {
-      console.error('Global error handler:', error, isFatal);
-      
-      // Log error but prevent crash in production
-      if (__DEV__) {
-        console.error('Uncaught exception:', error);
-        // In development, use original handler for debugging
-        if (originalHandler) {
-          originalHandler(error, isFatal);
-          return;
+// Safely initialize error handlers after React Native is ready
+// Defer initialization to prevent crashes during app startup
+if (typeof setTimeout !== 'undefined') {
+  setTimeout(() => {
+    try {
+      // Set up ErrorUtils handler if available
+      if (ErrorUtils && typeof ErrorUtils.getGlobalHandler === 'function') {
+        try {
+          const originalHandler = ErrorUtils.getGlobalHandler();
+          ErrorUtils.setGlobalHandler((error, isFatal) => {
+            try {
+              console.error('Global error handler:', error, isFatal);
+              
+              // Log error but prevent crash in production
+              if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                console.error('Uncaught exception:', error);
+                // In development, use original handler for debugging
+                if (originalHandler && typeof originalHandler === 'function') {
+                  originalHandler(error, isFatal);
+                  return;
+                }
+              }
+              
+              // In production, prevent crash by handling gracefully
+              console.error('Error caught by global handler (non-fatal):', error?.message || error);
+            } catch (handlerError) {
+              // Even error handler errors shouldn't crash
+              console.error('Error in global error handler:', handlerError);
+            }
+          });
+        } catch (error) {
+          console.warn('Failed to set global error handler:', error);
         }
       }
       
-      // In production, prevent crash by handling gracefully
-      // The app will continue running despite the error
-      console.error('Error caught by global handler (non-fatal):', error.message || error);
-    });
-  } catch (error) {
-    console.warn('Failed to set global error handler:', error);
-  }
-} else {
-  // ErrorUtils not available in Expo, but promise rejection tracking below will handle async errors
-  console.log('⚠️ ErrorUtils not available in Expo - using promise rejection tracker for error handling');
-}
-
-// Handle unhandled promise rejections
-if (typeof global !== 'undefined' && global.HermesInternal) {
-  const originalPromiseRejectionTracker = global.HermesInternal?.enablePromiseRejectionTracker;
-  if (originalPromiseRejectionTracker) {
-    global.HermesInternal.enablePromiseRejectionTracker({
-      allRejections: true,
-      onUnhandled: (id, rejection) => {
-        console.error('Unhandled promise rejection:', id, rejection);
-        // Don't crash - just log the error
-      },
-      onHandled: (id) => {
-        console.log('Promise rejection handled:', id);
+      // Handle unhandled promise rejections
+      if (typeof global !== 'undefined' && global.HermesInternal && typeof global.HermesInternal.enablePromiseRejectionTracker === 'function') {
+        try {
+          global.HermesInternal.enablePromiseRejectionTracker({
+            allRejections: true,
+            onUnhandled: (id, rejection) => {
+              try {
+                console.error('Unhandled promise rejection:', id, rejection);
+              } catch (e) {
+                // Don't crash on logging errors
+              }
+            },
+            onHandled: (id) => {
+              try {
+                console.log('Promise rejection handled:', id);
+              } catch (e) {
+                // Don't crash on logging errors
+              }
+            }
+          });
+        } catch (error) {
+          console.warn('Failed to set promise rejection tracker:', error);
+        }
       }
-    });
-  }
+    } catch (error) {
+      // Don't crash if error handler setup fails
+      console.warn('Error setting up global error handlers:', error);
+    }
+  }, 100); // Small delay to ensure React Native is initialized
 }
 
 export default function RootLayout() {
@@ -88,6 +108,12 @@ export default function RootLayout() {
           console.log('Fragment params - Type:', type, 'Access:', access_token ? 'Yes' : 'No', 'Refresh:', refresh_token ? 'Yes' : 'No');
           
           if (type === 'recovery' && access_token && refresh_token) {
+            if (!supabase) {
+              console.log('Supabase not available, redirecting to signin');
+              router.replace('/signin');
+              return;
+            }
+            
             console.log('Setting session with recovery tokens');
             const { data, error } = await supabase.auth.setSession({ 
               access_token, 

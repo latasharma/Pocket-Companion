@@ -44,7 +44,21 @@ export default function HomeScreen() {
         return;
       }
 
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!supabase) {
+        console.error('Supabase not initialized');
+        router.replace('/signin');
+        setLoading(false);
+        return;
+      }
+
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        router.replace('/signin');
+        setLoading(false);
+        return;
+      }
       
       if (!authUser) {
           router.replace('/signin');
@@ -54,24 +68,37 @@ export default function HomeScreen() {
       setUser(authUser);
 
       // Check if user has completed onboarding
-        const { data: profile } = await supabase
+      try {
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
         
-      if (!profile || !profile.first_name || !profile.companion_name) {
+        if (profileError) {
+          console.error('Profile fetch error:', profileError);
           router.replace('/onboarding');
+          setLoading(false);
           return;
         }
         
-      setUserProfile(profile);
-      } catch (error) {
-      console.error('Error checking auth:', error);
-        router.replace('/signin');
-      } finally {
-      setLoading(false);
+        if (!profile || !profile.first_name || !profile.companion_name) {
+          router.replace('/onboarding');
+          setLoading(false);
+          return;
+        }
+        
+        setUserProfile(profile);
+      } catch (profileError) {
+        console.error('Error fetching profile:', profileError);
+        router.replace('/onboarding');
       }
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      router.replace('/signin');
+    } finally {
+      setLoading(false);
+    }
     };
 
   const refreshProfile = async () => {
