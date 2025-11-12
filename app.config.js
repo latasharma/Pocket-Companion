@@ -26,10 +26,21 @@ export default {
       }
     },
     android: {
+      package: 'com.hellopoco.poco',
+      versionCode: 1,
       adaptiveIcon: {
         foregroundImage: './assets/images/adaptive-icon.png',
         backgroundColor: '#ffffff'
       },
+      permissions: [
+        'CAMERA',
+        'RECORD_AUDIO',
+        'READ_EXTERNAL_STORAGE',
+        'WRITE_EXTERNAL_STORAGE',
+        'ACCESS_FINE_LOCATION',
+        'ACCESS_COARSE_LOCATION',
+        'READ_CONTACTS'
+      ],
       edgeToEdgeEnabled: true
     },
     web: {
