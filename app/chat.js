@@ -138,60 +138,69 @@ export default function ChatScreen() {
     }
   };
 
-    // Handle voice input recording - press and hold style
+  // Handle voice input recording - press and hold style
   const handleVoiceInputToggle = async () => {
     if (!voiceInputEnabled || isLoading) {
       console.log("Voice input is disabled or loading");
       return;
     }
 
-    if (isRecording) {
-      // Stop recording
-      console.log("Stopping voice recording...");
+    try {
+      if (isRecording) {
+        // Stop recording
+        console.log("Stopping voice recording...");
 
+        setIsRecording(false);
+        if (recordingTimeout) {
+          clearTimeout(recordingTimeout);
+          setRecordingTimeout(null);
+        }
+        await VoiceInputService.stopRecording();
+      } else {
+        // Start recording
+        setIsRecording(true);
+        
+        // Set a timeout to auto-stop after 30 seconds
+        const timeout = setTimeout(() => {
+          if (isRecording) {
+            handleVoiceInputToggle();
+          }
+        }, 30000);
+        setRecordingTimeout(timeout);
+
+        await VoiceInputService.startRecording(
+          (transcribedText) => {
+            // Handle successful transcription
+            console.log("Voice input transcribed:", transcribedText);
+            setIsRecording(false);
+            if (recordingTimeout) {
+              clearTimeout(recordingTimeout);
+              setRecordingTimeout(null);
+            }
+            // Automatically send the message
+            if (transcribedText.trim()) {
+              console.log("Auto-sending voice message:", transcribedText);
+              sendVoiceMessage(transcribedText);
+            }
+          },
+          (error) => {
+            // Handle transcription error
+            console.error("Voice input error:", error);
+            setIsRecording(false);
+            if (recordingTimeout) {
+              clearTimeout(recordingTimeout);
+              setRecordingTimeout(null);
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Error in voice input toggle:", error);
       setIsRecording(false);
       if (recordingTimeout) {
         clearTimeout(recordingTimeout);
         setRecordingTimeout(null);
       }
-      await VoiceInputService.stopRecording();
-    } else {
-      // Start recording
-      setIsRecording(true);
-      
-      // Set a timeout to auto-stop after 30 seconds
-      const timeout = setTimeout(() => {
-        if (isRecording) {
-          handleVoiceInputToggle();
-        }
-      }, 30000);
-      setRecordingTimeout(timeout);
-
-      await VoiceInputService.startRecording(
-        (transcribedText) => {
-          // Handle successful transcription
-          console.log("Voice input transcribed:", transcribedText);
-          setIsRecording(false);
-          if (recordingTimeout) {
-            clearTimeout(recordingTimeout);
-            setRecordingTimeout(null);
-          }
-          // Automatically send the message
-          if (transcribedText.trim()) {
-            console.log("Auto-sending voice message:", transcribedText);
-            sendVoiceMessage(transcribedText);
-          }
-        },
-        (error) => {
-          // Handle transcription error
-          console.error("Voice input error:", error);
-          setIsRecording(false);
-          if (recordingTimeout) {
-            clearTimeout(recordingTimeout);
-            setRecordingTimeout(null);
-          }
-        }
-      );
     }
   };
 
@@ -220,7 +229,7 @@ export default function ChatScreen() {
 
                             if (profile) {
                       setUserProfile(profile);
-                      setCompanionName(profile.companion_name || 'Pixel');
+                      setCompanionName(profile.companion_name || 'your companion');
                       const voicePref = profile.voice_enabled !== false; // Default to true if not set
                       setVoiceEnabled(voicePref);
                       VoiceService.setVoiceEnabled(voicePref); // Set VoiceService state properly
@@ -230,7 +239,7 @@ export default function ChatScreen() {
           if (!messages || messages.length === 0) {
             const welcomeMessage = {
               id: Date.now(),
-              text: `Hi ${profile.first_name || 'there'}! It's ${profile.companion_name || 'Pixel'} here. I'm happy to chat with you! How's your day going?`,
+              text: `Hi ${profile.first_name || 'there'}! It's ${profile.companion_name || 'your companion'} here. I'm happy to chat with you! How's your day going?`,
               sender: 'ai',
               timestamp: new Date().toISOString(),
             };
@@ -345,11 +354,13 @@ export default function ChatScreen() {
         conversationHistory = conversationHistory.slice(-40); // Keep last 40 messages for better context
       }
 
-      // Get AI response
+      // Get AI response with userId
+      const userId = user?.id || null;
       const response = await AIService.sendMessage(
         voiceText,
         conversationHistory,
-        companionName
+        companionName,
+        userId
       );
       
       const aiMessage = {
@@ -492,11 +503,13 @@ export default function ChatScreen() {
         conversationHistory = conversationHistory.slice(-40); // Keep last 40 messages for better context
       }
 
-      // Get AI response
+      // Get AI response with userId (reuse user from line 444)
+      const userId = user?.id || null;
       const response = await AIService.sendMessage(
         userMessage.text,
         conversationHistory,
-        companionName
+        companionName,
+        userId
       );
       
       const aiMessage = {

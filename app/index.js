@@ -1,30 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Alert,
-  SafeAreaView,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    Alert,
+    Image,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { useDemo } from '../lib/demoContext';
 import { supabase } from '../lib/supabase';
 
 export default function HomeScreen() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { isDemoMode, demoProfile, exitDemoMode } = useDemo();
 
   const router = useRouter();
 
   useEffect(() => {
     checkAuthAndProfile();
-  }, []);
+  }, [isDemoMode]);
+
+  // Refresh profile data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        refreshProfile();
+      }
+    }, [user])
+  );
 
   const checkAuthAndProfile = async () => {
     try {
+      // If in demo mode, use demo profile
+      if (isDemoMode) {
+        setUser({ id: 'demo-user', email: 'demo@poceapp.com' });
+        setUserProfile(demoProfile);
+        setLoading(false);
+        return;
+      }
+
       const { data: { user: authUser } } = await supabase.auth.getUser();
       
       if (!authUser) {
@@ -55,6 +74,25 @@ export default function HomeScreen() {
       }
     };
 
+  const refreshProfile = async () => {
+    try {
+      if (!user) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+        
+      if (profile) {
+        setUserProfile(profile);
+        console.log('Profile refreshed, image URL:', profile.profile_image_url);
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+    }
+  };
+
   const handleStartChat = () => {
     router.push('/chat');
   };
@@ -64,6 +102,25 @@ export default function HomeScreen() {
   };
 
   const handleSignOut = async () => {
+    if (isDemoMode) {
+      Alert.alert(
+        'Exit Demo Mode',
+        'Are you sure you want to exit demo mode?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Exit Demo',
+            style: 'destructive',
+            onPress: () => {
+              exitDemoMode();
+              router.replace('/signin');
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
@@ -109,10 +166,17 @@ export default function HomeScreen() {
 
       <View style={styles.content}>
         <View style={styles.avatarSection}>
-        <Image
-          source={require('../assets/poco-avatar.png')}
-            style={styles.avatar}
-          />
+          {userProfile?.profile_image_url ? (
+            <Image
+              source={{ uri: userProfile.profile_image_url }}
+              style={styles.avatar}
+            />
+          ) : (
+            <Image
+              source={require('../assets/poco-avatar.png')}
+              style={styles.avatar}
+            />
+          )}
           <Text style={styles.userName}>
             {userProfile?.first_name || 'User'}
           </Text>
@@ -135,6 +199,8 @@ export default function HomeScreen() {
             <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
           </TouchableOpacity>
 
+          {/* Connect temporarily removed for App Store review */}
+
           <TouchableOpacity style={styles.optionCard} onPress={handleProfileSettings}>
             <View style={styles.optionIcon}>
               <Ionicons name="person-circle" size={32} color="#10b981" />
@@ -151,8 +217,9 @@ export default function HomeScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Your AI companion is ready to help!
+            {isDemoMode ? 'Demo Mode - Your AI companion is ready to help!' : 'Your AI companion is ready to help!'}
           </Text>
+          {/* Removed demo disclaimer for App Store build */}
         </View>
       </View>
     </SafeAreaView>
