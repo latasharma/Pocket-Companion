@@ -1,23 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
+  Alert,
   FlatList,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { AIService } from '../lib/aiService';
-import { supabase } from '../lib/supabase';
+import { authService } from '../lib/authService';
+import { deviceIdService } from '../lib/deviceIdService';
 import { MemoryService } from '../lib/memoryService';
-import { VoiceService } from '../lib/voiceService';
+import { supabase } from '../lib/supabase';
 import { VoiceInputService } from '../lib/voiceInputService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { VoiceService } from '../lib/voiceService';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
@@ -35,11 +38,62 @@ export default function ChatScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    fetchUserProfile();
-    initializeMemorySystem();
-    initializeVoiceService();
-    initializeVoiceInput();
+    let subscription = null;
+
+    const initializeApp = async () => {
+      try {
+        fetchUserProfile();
+        initializeMemorySystem();
+        initializeVoiceService();
+        initializeVoiceInput();
+        initializeDeviceId();
+        
+        // Set up auth state change listener
+        console.log('🔐 Setting up auth listener in useEffect');
+        subscription = authService.onAuthStateChange((event, session) => {
+          console.log('🔐 Auth event received:', event, 'Session:', !!session);
+          
+          if (event === 'SIGNED_OUT') {
+            console.log('👋 User signed out');
+            setMessages([]);
+            setUserProfile(null);
+            setCompanionName('Pixel');
+          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            console.log('🔄 User session updated:', event);
+            fetchUserProfile();
+          }
+        });
+        
+        if (!subscription) {
+          console.warn('⚠️ Auth listener returned null subscription');
+        } else {
+          console.log('✅ Auth listener set up successfully');
+        }
+      } catch (error) {
+        console.error('❌ Error in useEffect initialization:', error);
+      }
+    };
+
+    initializeApp();
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('🧹 Cleaning up subscriptions');
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        console.log('🧹 Unsubscribing from auth state changes');
+        subscription.unsubscribe();
+      }
+    };
   }, []);
+
+  const initializeDeviceId = async () => {
+    try {
+      const deviceId = await deviceIdService.getDeviceId();
+      console.log('📱 Device ID initialized in chat:', deviceId);
+    } catch (error) {
+      console.error('❌ Error initializing device ID:', error);
+    }
+  };
 
   // Initialize memory system and load chat history
   const initializeMemorySystem = async () => {
@@ -93,6 +147,7 @@ export default function ChatScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         // Save to database
+        console.log('Saving conversation to database for user:', user.id);
         await MemoryService.saveConversation(user.id, newMessages);
         
         // Also save to AsyncStorage as backup
@@ -208,55 +263,81 @@ export default function ChatScreen() {
     }
   };
 
-  const fetchUserProfile = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+const fetchUserProfile = async () => {
+  try {
+    // Use the new authService to get current user with session refresh
+    const user = await authService.getCurrentUser();
+    
+    if (!user) {
+        console.log('❌ No authenticated user found');
+        // Show a welcome message if not logged in
+        if (!messages || messages.length === 0) {
+          const welcomeMessage = {
+            id: Date.now(),
+            text: "Hi there! It's Pixel here. Please log in to continue our conversation.",
+            sender: 'ai',
+            timestamp: new Date().toISOString(),
+          };
+          setMessages([welcomeMessage]);
+        }
+        return;
+      }
 
-                            if (profile) {
-                      setUserProfile(profile);
-                      setCompanionName(profile.companion_name || 'Pixel');
-                      const voicePref = profile.voice_enabled !== false; // Default to true if not set
-                      setVoiceEnabled(voicePref);
-                      VoiceService.setVoiceEnabled(voicePref); // Set VoiceService state properly
-                      console.log('Voice preference loaded:', profile.voice_enabled, 'Voice enabled:', voicePref);
-          
-          // Only set welcome message if no existing messages
-          if (!messages || messages.length === 0) {
-            const welcomeMessage = {
-              id: Date.now(),
-              text: `Hi ${profile.first_name || 'there'}! It's ${profile.companion_name || 'Pixel'} here. I'm happy to chat with you! How's your day going?`,
-              sender: 'ai',
-              timestamp: new Date().toISOString(),
-            };
-            setMessages([welcomeMessage]);
-            saveChatHistory([welcomeMessage]);
-          }
-        } else {
-          // Only set default welcome message if no existing messages
-          if (!messages || messages.length === 0) {
-      const welcomeMessage = {
-        id: Date.now(),
-              text: "Hi there! It's Pixel here. I'm happy to chat with you! How's your day going?",
-        sender: 'ai',
-        timestamp: new Date().toISOString(),
-      };
-      setMessages([welcomeMessage]);
-            saveChatHistory([welcomeMessage]);
-          }
+      // Now fetch the profile using the authenticated user
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        console.error('❌ Error fetching profile:', profileError);
+        throw profileError;
+      }
+
+      if (profile) {
+        setUserProfile(profile);
+        const companionNameToUse = profile.companion_name || 'Pixel';
+        setCompanionName(companionNameToUse);
+        console.log('🎯 Companion name set from profile:', companionNameToUse);
+        
+        const voicePref = profile.voice_enabled !== false;
+        setVoiceEnabled(voicePref);
+        VoiceService.setVoiceEnabled(voicePref);
+        console.log('🎙️ Voice preference loaded:', voicePref);
+        
+        // Only set welcome message if no existing messages
+        if (!messages || messages.length === 0) {
+          const welcomeMessage = {
+            id: Date.now(),
+            text: `Hi ${profile.first_name || 'there'}! It's ${companionNameToUse} here. I'm happy to chat with you! How's your day going?`,
+            sender: 'ai',
+            timestamp: new Date().toISOString(),
+          };
+          setMessages([welcomeMessage]);
+          saveChatHistory([welcomeMessage]);
+          console.log('🎯 Welcome message set');
+        }
+      } else {
+        console.log('⚠️ No profile found for user');
+        // Set default welcome if no profile
+        if (!messages || messages.length === 0) {
+          const welcomeMessage = {
+            id: Date.now(),
+            text: "Hi there! It's Pixel here. I'm happy to chat with you! How's your day going?",
+            sender: 'ai',
+            timestamp: new Date().toISOString(),
+          };
+          setMessages([welcomeMessage]);
+          saveChatHistory([welcomeMessage]);
         }
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('❌ Error fetching user profile:', error);
       // Fallback welcome message
       const welcomeMessage = {
         id: Date.now(),
-        text: "Hi there! I'm Pixel, your AI companion. I'm so excited to chat with you and learn more about your day! What would you like to talk about?",
+        text: "Hi there! I'm Pixel, your AI companion. I'm happy to chat with you! What would you like to talk about?",
         sender: 'ai',
         timestamp: new Date().toISOString(),
       };
@@ -264,39 +345,51 @@ export default function ChatScreen() {
     }
   };
 
-
-
   const sendVoiceMessage = async (voiceText) => {
     if (!voiceText.trim() || isLoading) return;
 
-    const userMessage = {
-      id: Date.now(),
-      text: voiceText.trim(),
-      sender: 'user',
-      timestamp: new Date().toISOString(),
-    };
-
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    saveChatHistory(newMessages);
-    setIsLoading(true);
-
     try {
+      // Check if user is still authenticated before sending
+      console.log('🔐 Checking authentication before sending voice message...');
+      const user = await authService.getCurrentUser();
+      
+      if (!user) {
+        Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+        console.log('❌ User not authenticated, cannot send voice message');
+        return;
+      }
+
+      const userMessage = {
+        id: Date.now(),
+        text: voiceText.trim(),
+        sender: 'user',
+        timestamp: new Date().toISOString(),
+      };
+
+      const newMessages = [...messages, userMessage];
+      setMessages(newMessages);
+      saveChatHistory(newMessages);
+      setIsLoading(true);
+
+      // Get device ID
+      const deviceId = await deviceIdService.getDeviceId();
+      console.log('📱 Using device ID:', deviceId);
+
       // Get enhanced context from memory system
-      const { data: { user } } = await supabase.auth.getUser();
       let conversationHistory = [];
-      let userPreferences = [];
 
       if (user) {
-        // Get conversation context from database
-        conversationHistory = await MemoryService.getConversationContext(user.id, 10);
-        
-        // Get user preferences context
-        userPreferences = await MemoryService.getPreferencesContext(user.id);
+        try {
+          conversationHistory = await MemoryService.getConversationContext(user.id, 10);
+          console.log('📄 Loaded conversation context from database:', conversationHistory.length, 'messages');
+        } catch (contextError) {
+          console.warn('⚠️ Could not load conversation context:', contextError);
+        }
       }
 
       // Ensure conversation history is in the correct format
       if (conversationHistory.length === 0) {
+        console.log('📄 Using current messages as conversation history');
         // Fallback to current messages if database context is empty
         conversationHistory = messages
           .filter(msg => {
@@ -305,7 +398,7 @@ export default function ChatScreen() {
             // Include AI messages that are responses to user messages (not welcome messages)
             if (msg.sender === 'ai') {
               const isWelcomeMessage = msg.text.includes('I\'m so excited to chat with you') || 
-                                     msg.text.includes('What would you like to talk about');
+                                    msg.text.includes('What would you like to talk about');
               return !isWelcomeMessage;
             }
             return false;
@@ -321,7 +414,7 @@ export default function ChatScreen() {
             // Filter out welcome messages
             if (msg.sender === 'ai') {
               const isWelcomeMessage = msg.text.includes('I\'m so excited to chat with you') || 
-                                     msg.text.includes('What would you like to talk about');
+                                    msg.text.includes('What would you like to talk about');
               return !isWelcomeMessage;
             }
             return true;
@@ -333,8 +426,10 @@ export default function ChatScreen() {
       }
 
       // Debug: Log what's being sent to AI
-      console.log('Sending to AI:', {
-        userMessage: voiceText,
+      console.log('Sending voice to AI:', {
+        voiceText: voiceText,
+        companionName: companionName,
+        deviceId: deviceId,
         conversationHistoryLength: conversationHistory.length,
         conversationHistory: conversationHistory.slice(-5) // Only show last 5 messages for debugging
       });
@@ -346,10 +441,13 @@ export default function ChatScreen() {
       }
 
       // Get AI response
+      console.log('🤖 Calling AI service for voice message...', userProfile);
       const response = await AIService.sendMessage(
         voiceText,
         conversationHistory,
-        companionName
+        companionName,
+        deviceId,
+        userProfile.id,
       );
       
       const aiMessage = {
@@ -360,7 +458,7 @@ export default function ChatScreen() {
       };
 
       // Start voice synthesis immediately after getting AI response
-      console.log('Voice enabled in chat:', voiceEnabled);
+      console.log('🎙️ Voice enabled in chat:', voiceEnabled);
       if (voiceEnabled) {
         // Show speaking indicator immediately to indicate voice is being prepared
         setIsSpeaking(true);
@@ -380,33 +478,46 @@ export default function ChatScreen() {
         // Start voice synthesis
         VoiceService.speak(aiMessage.text)
           .then(() => {
-            console.log('Voice synthesis completed successfully');
+            console.log('✅ Voice synthesis completed successfully');
           })
           .catch((error) => {
-            console.error('Voice synthesis failed:', error);
+            console.error('❌ Voice synthesis failed:', error);
             setIsSpeaking(false); // Hide indicator if synthesis fails
             setVoiceStatus('');
           });
-        console.log('Voice synthesis started immediately for response length:', aiMessage.text.length);
+        console.log('🎵 Voice synthesis started immediately for response length:', aiMessage.text.length);
       }
 
       const updatedMessages = [...newMessages, aiMessage];
       setMessages(updatedMessages);
       saveChatHistory(updatedMessages);
+
     } catch (error) {
-      console.error('AI Service Error:', error);
+      console.error('❌ AI Service Error:', error);
       
-      // Fallback response
-      const aiMessage = {
-        id: Date.now() + 1,
-        text: "I'm having trouble connecting right now, but I'm here to chat! What's on your mind?",
-        sender: 'ai',
-        timestamp: new Date().toISOString(),
-      };
-      
-      const updatedMessages = [...newMessages, aiMessage];
-      setMessages(updatedMessages);
-      saveChatHistory(updatedMessages);
+      // Handle JWT errors
+      if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+        console.warn('⏰ JWT expired during voice send, refreshing...');
+        const refreshed = await authService.refreshSession();
+        if (refreshed) {
+          console.log('🔄 Retrying voice message after session refresh');
+          return sendVoiceMessage(voiceText); // Retry with original text
+        } else {
+          Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+        }
+      } else {
+        // Fallback response
+        const aiMessage = {
+          id: Date.now() + 1,
+          text: "I'm having trouble connecting right now, but I'm here to chat! What's on your mind?",
+          sender: 'ai',
+          timestamp: new Date().toISOString(),
+        };
+        
+        const updatedMessages = [...messages, aiMessage];
+        setMessages(updatedMessages);
+        saveChatHistory(updatedMessages);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -415,35 +526,47 @@ export default function ChatScreen() {
   const sendMessage = async () => {
     if (!inputText.trim() || isLoading) return;
 
-    const userMessage = {
-      id: Date.now(),
-      text: inputText.trim(),
-      sender: 'user',
-      timestamp: new Date().toISOString(),
-    };
-
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    saveChatHistory(newMessages);
-    setInputText('');
-    setIsLoading(true);
-
     try {
+      // Check if user is still authenticated before sending
+      const user = await authService.getCurrentUser();
+      
+      if (!user) {
+        Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+        return;
+      }
+
+      const userMessage = {
+        id: Date.now(),
+        text: inputText.trim(),
+        sender: 'user',
+        timestamp: new Date().toISOString(),
+      };
+
+      const newMessages = [...messages, userMessage];
+      setMessages(newMessages);
+      saveChatHistory(newMessages);
+      setInputText('');
+      setIsLoading(true);
+
+      // Get device ID
+      const deviceId = await deviceIdService.getDeviceId();
+      console.log('🔱 Using device ID:', deviceId);
+
       // Get enhanced context from memory system
-      const { data: { user } } = await supabase.auth.getUser();
       let conversationHistory = [];
-      let userPreferences = [];
 
       if (user) {
-        // Get conversation context from database
-        conversationHistory = await MemoryService.getConversationContext(user.id, 10);
-        
-        // Get user preferences context
-        userPreferences = await MemoryService.getPreferencesContext(user.id);
+        try {
+          conversationHistory = await MemoryService.getConversationContext(user.id, 10);
+          console.log('📖 Loaded conversation context from database:', conversationHistory.length, 'messages');
+        } catch (contextError) {
+          console.warn('⚠️ Could not load conversation context:', contextError);
+        }
       }
 
       // Ensure conversation history is in the correct format
       if (conversationHistory.length === 0) {
+        console.log('📖 Using current messages as conversation history');
         // Fallback to current messages if database context is empty
         conversationHistory = messages
           .filter(msg => {
@@ -452,7 +575,7 @@ export default function ChatScreen() {
             // Include AI messages that are responses to user messages (not welcome messages)
             if (msg.sender === 'ai') {
               const isWelcomeMessage = msg.text.includes('I\'m so excited to chat with you') || 
-                                     msg.text.includes('What would you like to talk about');
+                                    msg.text.includes('What would you like to talk about');
               return !isWelcomeMessage;
             }
             return false;
@@ -468,7 +591,7 @@ export default function ChatScreen() {
             // Filter out welcome messages
             if (msg.sender === 'ai') {
               const isWelcomeMessage = msg.text.includes('I\'m so excited to chat with you') || 
-                                     msg.text.includes('What would you like to talk about');
+                                    msg.text.includes('What would you like to talk about');
               return !isWelcomeMessage;
             }
             return true;
@@ -481,7 +604,9 @@ export default function ChatScreen() {
 
       // Debug: Log what's being sent to AI
       console.log('Sending to AI:', {
-        userMessage: userMessage.text,
+        userMessage: inputText.trim(),
+        companionName: companionName,
+        deviceId: deviceId,
         conversationHistoryLength: conversationHistory.length,
         conversationHistory: conversationHistory.slice(-5) // Only show last 5 messages for debugging
       });
@@ -493,10 +618,15 @@ export default function ChatScreen() {
       }
 
       // Get AI response
+      console.log('🤖 Calling AI service...', deviceId);
+      console.log('🤖 Calling AI service for voice message...', userProfile);
+      console.log('🤖 Calling AI service for voice message userProfileID...', userProfile['id']);
       const response = await AIService.sendMessage(
         userMessage.text,
         conversationHistory,
-        companionName
+        companionName,
+        deviceId,
+        userProfile['id'],
       );
       
       const aiMessage = {
@@ -506,29 +636,67 @@ export default function ChatScreen() {
         timestamp: new Date().toISOString(),
       };
 
-                        // Speak the AI response if voice is enabled in profile
-                  console.log('Voice enabled in chat:', voiceEnabled);
-                  if (voiceEnabled) {
-                    VoiceService.speak(aiMessage.text);
-                  }
+      // Start voice synthesis if enabled
+      console.log('🎙️ Voice enabled in chat:', voiceEnabled);
+      if (voiceEnabled) {
+        // Show speaking indicator immediately to indicate voice is being prepared
+        setIsSpeaking(true);
+        setVoiceStatus('preparing');
+        
+        // Set up callbacks for voice start/end
+        VoiceService.onVoiceStart = () => {
+          console.log('🎵 Voice started playing - changing indicator text');
+          setVoiceStatus('speaking');
+        };
+        VoiceService.onVoiceEnd = () => {
+          console.log('🎵 Voice ended - hiding speaking indicator');
+          setIsSpeaking(false);
+          setVoiceStatus('');
+        };
+        
+        // Start voice synthesis
+        VoiceService.speak(aiMessage.text)
+          .then(() => {
+            console.log('✅ Voice synthesis completed successfully');
+          })
+          .catch((error) => {
+            console.error('❌ Voice synthesis failed:', error);
+            setIsSpeaking(false); // Hide indicator if synthesis fails
+            setVoiceStatus('');
+          });
+        console.log('🎵 Voice synthesis started immediately for response length:', aiMessage.text.length);
+      }
 
       const updatedMessages = [...newMessages, aiMessage];
       setMessages(updatedMessages);
       saveChatHistory(updatedMessages);
+
     } catch (error) {
-      console.error('AI Service Error:', error);
+      console.error('❌ AI Service Error:', error);
       
-      // Fallback response
-      const aiMessage = {
-        id: Date.now() + 1,
-        text: "I'm having trouble connecting right now, but I'm here to chat! What's on your mind?",
-        sender: 'ai',
-        timestamp: new Date().toISOString(),
-      };
-      
-      const updatedMessages = [...newMessages, aiMessage];
-      setMessages(updatedMessages);
-      saveChatHistory(updatedMessages);
+      // Handle JWT errors
+      if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+        console.warn('⏰ JWT expired during send, refreshing...');
+        const refreshed = await authService.refreshSession();
+        if (refreshed) {
+          console.log('📄 Retrying message after session refresh');
+          return sendMessage(); // Retry with original text
+        } else {
+          Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+        }
+      } else {
+        // Fallback response
+        const aiMessage = {
+          id: Date.now() + 1,
+          text: "I'm having trouble connecting right now, but I'm here to chat! What's on your mind?",
+          sender: 'ai',
+          timestamp: new Date().toISOString(),
+        };
+        
+        const updatedMessages = [...messages, aiMessage];
+        setMessages(updatedMessages);
+        saveChatHistory(updatedMessages);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -662,13 +830,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  voiceButton: {
-    padding: 8,
-    backgroundColor: '#F0FDF4',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#10B981',
-  },
   profileButton: {
     padding: 8,
     backgroundColor: '#F0FDF4',
@@ -738,6 +899,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
+    alignItems: 'flex-end',
   },
   textInput: {
     flex: 1,
@@ -762,6 +924,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#10B981',
     marginRight: 8,
+    flexShrink: 0,
   },
   voiceButtonRecording: {
     backgroundColor: '#FEF2F2',
@@ -790,6 +953,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   sendButtonDisabled: {
     backgroundColor: '#D1D5DB',

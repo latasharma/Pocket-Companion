@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform, ScrollView, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../lib/supabase';
 
 export default function SignInScreen() {
@@ -34,8 +34,8 @@ export default function SignInScreen() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'aipocketcompanion://reset-password',
-        emailRedirectTo: 'aipocketcompanion://reset-password',
+        redirectTo: 'hellopoco.app://reset-password',
+        emailRedirectTo: 'hellopoco.app://reset-password',
       });
 
       if (error) {
@@ -312,7 +312,7 @@ export default function SignInScreen() {
 
               </View>
               <Text style={{ fontSize: 11, color: '#10b981', marginTop: 8, fontWeight: '500' }}>
-                💡 Tip: Try "MyCat@2024!" or "SecurePass#123" - mix letters, numbers & symbols!
+                {`💡 Tip: Try "MyCat@2024!" or "SecurePass#123" - mix letters, numbers & symbols!`}
               </Text>
             </View>
           )}

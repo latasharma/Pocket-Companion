@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
   Alert,
+  ScrollView,
+  StyleSheet,
   Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../lib/supabase';
-import { router } from 'expo-router';
 import VoiceSelector from '../components/VoiceSelector';
+import { supabase } from '../lib/supabase';
 import { VoiceService } from '../lib/voiceService';
 
 export default function ProfileScreen() {
@@ -112,7 +112,7 @@ export default function ProfileScreen() {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           companion_name: companionName.trim(),
-          voice_enabled: voiceEnabled,
+          //voice_enabled: voiceEnabled,
         });
 
       if (error) throw error;
@@ -218,8 +218,8 @@ export default function ProfileScreen() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(authUser.email, {
-        redirectTo: 'aipocketcompanion://reset-password',
-        emailRedirectTo: 'aipocketcompanion://reset-password',
+        redirectTo: 'hellopoco.app://reset-password',
+        emailRedirectTo: 'hellopoco.app://reset-password',
       });
 
       if (error) {
@@ -756,17 +756,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  settingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
   settingText: {
     marginLeft: 12,
     flex: 1,
@@ -775,11 +764,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#1f2937',
-  },
-  settingDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 2,
   },
   quickActionButton: {
     flexDirection: 'row',

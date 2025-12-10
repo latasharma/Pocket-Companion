@@ -1,41 +1,142 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# ============================================================================
+# React Native + iOS + Android + Node — COMPLETE PRODUCTION GITIGNORE
+# ============================================================================
 
-# dependencies
+# -----------------------------------------
+# Node / General JS
+# -----------------------------------------
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
 
-# Expo
+# Metro bundler
 .expo/
-dist/
-web-build/
-expo-env.d.ts
+.expo-shared/
+.expo/*
 
-# Native
-.kotlin/
-*.orig.*
+# Babel, TypeScript
+*.tsbuildinfo
+.cache/
+babel.config.js.timestamp
+
+# dotenv / env files
+.env
+.env.*
+.env*.local
+
+# -----------------------------------------
+# React Native build / output files
+# -----------------------------------------
+# JS Bundles
+*.bundle
+*.jsbundle
+
+# Coverage
+coverage/
+
+# -----------------------------------------
+# iOS / Xcode
+# -----------------------------------------
+ios/build/
+ios/Pods/
+ios/DerivedData/
+ios/*.xcworkspace/
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods
+Podfile.lock        # OPTIONAL: often committed; remove if you don’t want lock file
+ios/Podfile.lock
+
+# Archives / device data
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# -----------------------------------------
+# Android / Gradle
+# -----------------------------------------
+android/.gradle/
+android/.idea/
+android/local.properties
+android/app/build/
+android/build/
+
+# Keystore files
 *.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+*.keystore
+*.jks.old
+*.keystore.old
 
-# Metro
-.metro-health-check*
+# NOTE: DO NOT commit your keystore files — they must remain local!
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# NDK/SDK
+.cxx/
 
+# Generated intermediate build files
+*.iml
+
+# -----------------------------------------
+# OS-specific files
+# -----------------------------------------
 # macOS
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# Windows
+Thumbs.db
+ehthumbs.db
 
-# typescript
+# Linux
+*.swp
+*.swo
+
+# -----------------------------------------
+# Logs
+# -----------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.yarn
+
+# Crash reports
+*.stackdump
+*.crash
+
+# -----------------------------------------
+# Misc / Tools
+# -----------------------------------------
+dist/
+web-build/
+app-example
+expo-env.d.ts
+
+# TypeScript
 *.tsbuildinfo
 
-app-example
-.env
-.env*
+# Temporary files
+.tmp/
+temp/
+*.tmp
+*.orig.*
+
+# JetBrains (WebStorm / IntelliJ)
+.idea/
+
+# VSCode
+.vscode/
+
+# Misc caches
+.parcel-cache/
