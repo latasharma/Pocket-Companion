@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 
 export default function ResetPasswordScreen() {
@@ -256,7 +256,7 @@ export default function ResetPasswordScreen() {
                   </Text>
                 </View>
                 <Text style={{ fontSize: 11, color: '#10b981', marginTop: 8, fontWeight: '500' }}>
-                  💡 Tip: Try "MyCat@2024!" or "SecurePass#123" - mix letters, numbers & symbols!
+                  {`💡 Tip: Try "MyCat@2024!" or "SecurePass#123" - mix letters, numbers & symbols!`}
                 </Text>
               </View>
             )}
