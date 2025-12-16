@@ -364,12 +364,34 @@ export default function AddMedicationScreen({ navigation }) {
       console.log('Medication saved response:', saved);
 
       if (saved && saved.id) {
-        Alert.alert('Success', 'Medication saved successfully!');
-        navigation?.goBack?.();
+        Alert.alert(
+          'Success',
+          'Medication saved successfully!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                //navigation?.goBack?.();
+                router.back();
+              },
+            },
+          ]
+        );
       } else {
         console.error('Save returned no ID:', saved);
-        Alert.alert('Error', 'Medication saved but no ID returned.');
-        navigation?.goBack?.();
+        Alert.alert(
+          'Error',
+          'Medication saved but no ID returned.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                //navigation?.goBack?.();
+                //router.back();
+              },
+            },
+          ]
+        );
       }
     } catch (err) {
       console.error('AddMedicationScreen.onSave - Full error:', err);
