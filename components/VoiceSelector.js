@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
 import {
-  View,
+  Alert,
+  StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  Switch,
+  View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
 
 // ElevenLabs Voice IDs for different voices
 const VOICE_OPTIONS = {
@@ -179,12 +179,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1f2937',
   },
   toggleContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     gap: 10,
   },

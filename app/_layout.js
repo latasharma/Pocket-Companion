@@ -1,8 +1,8 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import { Linking } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { supabase } from "../lib/supabase";
-import { useRouter } from "expo-router";
 
 export default function RootLayout() {
   const router = useRouter();
@@ -87,18 +87,20 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="profile" />
-      <Stack.Screen name="privacy" />
-      <Stack.Screen name="terms" />
-      <Stack.Screen name="support" />
-      <Stack.Screen name="about" />
-      <Stack.Screen name="signin" />
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="chat" />
-      <Stack.Screen name="reset-password" />
-      <Stack.Screen name="memory" />
-    </Stack>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="privacy" />
+        <Stack.Screen name="terms" />
+        <Stack.Screen name="support" />
+        <Stack.Screen name="about" />
+        <Stack.Screen name="signin" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="chat" />
+        <Stack.Screen name="reset-password" />
+        <Stack.Screen name="memory" />
+      </Stack>
+    </GestureHandlerRootView>
   );
 }

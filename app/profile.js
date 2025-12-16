@@ -357,9 +357,54 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.settingsCard}>
             <TouchableOpacity style={styles.quickActionButton} onPress={() => router.push('/chat')}>
-              <View style={styles.quickActionContent}>
+              <View style={styles.settingInfo}>
                 <Ionicons name="chatbubbles" size={24} color="#10b981" />
-                <Text style={styles.quickActionText}>Chat with {companionName || 'Pixel'}</Text>
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Chat with {companionName || 'Pixel'}</Text>
+                  <Text style={styles.settingDescription}>Start a conversation with your AI companion</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Reminders</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/Reminders/ReminderListScreen')}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="medkit" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Manage Medications</Text>
+                  {/* <Text style={styles.settingDescription}>Add, edit, or remove your medication reminders</Text> */}
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+ 
+            <View style={styles.divider} />
+ 
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reminder-settings')}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="time" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Appointments</Text>
+                  {/* <Text style={styles.settingDescription}>Configure medication and other reminders</Text> */}
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reminder-settings')}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="calendar" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Important Dates</Text>
+                  {/* <Text style={styles.settingDescription}>Configure medication and other reminders</Text> */}
+                </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </TouchableOpacity>
@@ -769,8 +814,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
   },
   quickActionContent: {
     flexDirection: 'row',
@@ -787,8 +832,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
   },
   menuItemText: {
     fontSize: 16,
@@ -796,5 +841,11 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginLeft: 12,
     flex: 1,
+  },
+  menuIcon: {
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
 });
