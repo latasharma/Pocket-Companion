@@ -11,163 +11,175 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as SupabaseLib from '../../lib/supabase';
-const supabase = SupabaseLib.supabase || SupabaseLib.default || SupabaseLib;
+import MedicationService from '../../lib/medicationService';
 
 /**
  * Enhanced ReminderListScreen
- * - Uses app-styled AppBar
- * - Shows hardcoded reminders for testing
- * - Provides "Add" button
- * - Supports swipe-left actions to reveal Edit/Delete (using Swipeable)
+ * - Fetches medications from Supabase
+ * - Displays list of medications
+ * - Provides "Add" button to add new medications
+ * - Supports swipe-left actions to reveal Delete
  *
  * File: [`app/Reminders/ReminderListScreen.js`](app/Reminders/ReminderListScreen.js:1)
  */
 
-const nowISO = () => new Date().toISOString();
-
-const hardcodedReminders = [
-  {
-    id: 'hc-1',
-    title: 'Doctor Appointment',
-    description: 'Consultation with Dr. Smith',
-    reminder_time: new Date(Date.now() + 3600 * 1000).toISOString(),
-    category: 'appointments',
-  },
-  {
-    id: 'hc-2',
-    title: 'Take Vitamin D',
-    description: 'Morning supplement',
-    reminder_time: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
-    category: 'medications',
-  },
-];
-
-const ReminderService = {
-  async fetchAll() {
-    try {
-      const { data, error } = await supabase
-        .from('reminders')
-        .select('*')
-        .eq('is_deleted', false)
-        .order('reminder_time', { ascending: true });
-
-      if (error) {
-        // If supabase not available or RLS blocks, return empty and rely on hardcoded
-        console.warn('ReminderService.fetchAll: supabase error', error);
-        return [];
-      }
-      return data || [];
-    } catch (err) {
-      console.warn('ReminderService.fetchAll failed, returning empty', err);
-      return [];
-    }
-  },
-};
-
 export default function ReminderListScreen({ navigation }) {
-  const [reminders, setReminders] = useState(hardcodedReminders);
+  const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(false);
   const refreshRef = useRef(null);
 
-  async function load() {
+  /**
+   * Fetch all medications from Supabase
+   */
+  async function loadMedications() {
     setLoading(true);
     try {
-      const data = await ReminderService.fetchAll();
-      // If real data exists, show it; otherwise keep hardcoded for testing
-      setReminders(data.length ? data : hardcodedReminders);
+      console.log('Loading medications...');
+      const data = await MedicationService.fetchMedications();
+      console.log('Medications fetched:', data);
+      setMedications(data || []);
     } catch (err) {
-      Alert.alert('Error', 'Could not load reminders.');
+      console.error('Error loading medications:', err);
+      Alert.alert('Error', 'Could not load medications.');
+      setMedications([]);
     } finally {
       setLoading(false);
     }
   }
 
+  /**
+   * Refresh medications when screen comes into focus
+   */
   useEffect(() => {
-    const unsub = navigation?.addListener?.('focus', load);
-    load();
+    const unsub = navigation?.addListener?.('focus', () => {
+      loadMedications();
+    });
+    loadMedications();
     return unsub;
   }, [navigation]);
 
+  /**
+   * Navigate to Add Medication screen
+   */
   function onAdd() {
-    // Navigate to the standalone ReminderForm screen
-    // Use expo-router's router so the path points directly to the file: app/Reminders/ReminderFormScreen.js
-    //router.push('/Reminders/ReminderFormScreen');
     router.push('/Reminders/AddMedicationScreen');
   }
- 
-  function onEdit(reminder) {
-    // Navigate to the form with reminderId as a param using router.push
-    // expo-router accepts query params encoded into the path
+
+  /**
+   * Navigate to Edit Medication screen
+   */
+  function onEdit(medication) {
     router.push({
-      pathname: '/Reminders/ReminderFormScreen',
-      params: { reminderId: reminder.id },
+      pathname: '/Reminders/EditMedicationScreen',
+      params: { medicationId: medication.id },
     });
   }
 
-  async function onDelete(reminder) {
-    // For hardcoded items just remove locally; for real ones call API
-    if (reminder.id?.startsWith('hc-')) {
-      setReminders((prev) => prev.filter((r) => r.id !== reminder.id));
-      return;
-    }
-
-    try {
-      await supabase.from('reminders').update({ is_deleted: true }).eq('id', reminder.id);
-      // refetch
-      load();
-    } catch (err) {
-      console.warn('delete failed', err);
-      Alert.alert('Error', 'Could not delete reminder.');
-    }
+  /**
+   * Delete medication with confirmation
+   */
+  async function onDelete(medication) {
+    Alert.alert(
+      'Delete Medication',
+      `Are you sure you want to delete ${medication.medication_name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await MedicationService.softDeleteMedication(medication.id);
+              loadMedications(); // Refresh the list
+              Alert.alert('Success', 'Medication deleted successfully');
+            } catch (err) {
+              console.error('Delete failed:', err);
+              Alert.alert('Error', 'Could not delete medication.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
-  function renderRightActions(reminder) {
-    // Simple, non-animated side-by-side action buttons.
-    // Avoid transforms so buttons stay flush and visible across devices.
-    return () => {
-      // return (
-      //   <View style={styles.rightActionContainer}>
-      //     <TouchableOpacity
-      //       style={[styles.actionButton, styles.editButton]}
-      //       onPress={() => onEdit(reminder)}
-      //       activeOpacity={0.8}
-      //     >
-      //       <Ionicons name="create" size={18} color="#ffffff" />
-      //       <Text style={styles.actionText}>Edit</Text>
-      //     </TouchableOpacity>
+  /**
+   * Render right swipe actions (Edit, Delete)
+   */
+  function renderRightActions(medication) {
+    // return () => (
+    //   <View style={styles.rightActionContainer}>
+    //     <TouchableOpacity
+    //       style={[styles.actionButton, styles.editButton]}
+    //       onPress={() => onEdit(medication)}
+    //       activeOpacity={0.8}
+    //     >
+    //       <Ionicons name="create" size={18} color="#ffffff" />
+    //       <Text style={styles.actionText}>Edit</Text>
+    //     </TouchableOpacity>
 
-      //     <TouchableOpacity
-      //       style={[styles.actionButton, styles.deleteButton]}
-      //       onPress={() =>
-      //         Alert.alert('Delete', 'Delete this reminder?', [
-      //           { text: 'Cancel', style: 'cancel' },
-      //           { text: 'Delete', style: 'destructive', onPress: () => onDelete(reminder) },
-      //         ])
-      //       }
-      //       activeOpacity={0.8}
-      //     >
-      //       <Ionicons name="trash" size={18} color="#ffffff" />
-      //       <Text style={styles.actionText}>Delete</Text>
-      //     </TouchableOpacity>
-      //   </View>
-      // );
-    };
+    //     <TouchableOpacity
+    //       style={[styles.actionButton, styles.deleteButton]}
+    //       onPress={() => onDelete(medication)}
+    //       activeOpacity={0.8}
+    //     >
+    //       <Ionicons name="trash" size={18} color="#ffffff" />
+    //       <Text style={styles.actionText}>Delete</Text>
+    //     </TouchableOpacity>
+    //   </View>
+    // );
   }
 
+  /**
+   * Format time for display
+   */
+  function formatDoseTimes(doseTimes) {
+    if (!doseTimes || doseTimes.length === 0) return 'No times';
+    return doseTimes.join(', ');
+  }
+
+  /**
+   * Render individual medication item
+   */
   function renderItem({ item }) {
     return (
       <Swipeable renderRightActions={renderRightActions(item)} overshootRight={false}>
         <TouchableOpacity
           style={styles.item}
-          onPress={() => navigation?.navigate?.('ReminderDetail', { reminderId: item.id })}
+          onPress={() => {
+            // Navigate to detail screen if needed
+            // router.push({ pathname: '/Reminders/MedicationDetail', params: { medicationId: item.id } });
+          }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={styles.itemMeta}>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.time}>{new Date(item.reminder_time).toLocaleString()}</Text>
+          <View style={styles.itemContent}>
+            {/* Medication Name and Type */}
+            <View style={styles.itemHeader}>
+              <Text style={styles.title}>{item.medication_name}</Text>
+              <Text style={styles.medicationType}>{item.medication_type}</Text>
             </View>
-            <Text style={styles.category}>{item.category}</Text>
+
+            {/* Dosage Information */}
+            <Text style={styles.dosage}>
+              Dosage: {item.dosage_value}
+            </Text>
+
+            {/* Frequency and Times */}
+            <Text style={styles.frequency}>
+              {item.frequency_type === 'once' ? 'Once' : item.frequency_type.charAt(0).toUpperCase() + item.frequency_type.slice(1)} ({item.times_per_day}x)
+            </Text>
+
+            {/* Dose Times */}
+            <Text style={styles.doseTimes}>
+              Times: {formatDoseTimes(item.dose_times)}
+            </Text>
+
+            {/* Start and End Dates */}
+            <Text style={styles.dates}>
+              {new Date(item.start_date).toLocaleDateString()} 
+              {item.end_date ? ` - ${new Date(item.end_date).toLocaleDateString()}` : ' - Ongoing'}
+            </Text>
           </View>
         </TouchableOpacity>
       </Swipeable>
@@ -181,7 +193,7 @@ export default function ReminderListScreen({ navigation }) {
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#10B981" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Reminders</Text>
+          <Text style={styles.headerTitle}>Medications</Text>
           <TouchableOpacity style={styles.addButton} onPress={onAdd}>
             <Ionicons name="add" size={22} color="#ffffff" />
           </TouchableOpacity>
@@ -189,13 +201,19 @@ export default function ReminderListScreen({ navigation }) {
       </SafeAreaView>
 
       <FlatList
-        data={reminders}
-        keyExtractor={(i) => i.id}
+        data={medications}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         refreshing={loading}
-        onRefresh={load}
-        contentContainerStyle={reminders.length === 0 ? { flex: 1, justifyContent: 'center' } : {}}
-        ListEmptyComponent={<Text style={styles.empty}>No reminders yet.</Text>}
+        onRefresh={loadMedications}
+        contentContainerStyle={medications.length === 0 ? { flex: 1, justifyContent: 'center' } : {}}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="medkit" size={48} color="#d1d5db" />
+            <Text style={styles.empty}>No medications yet.</Text>
+            <Text style={styles.emptySubtext}>Tap + to add your first medication</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -237,24 +255,83 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     backgroundColor: '#fff',
-    overflow: 'hidden', // clip item content so action buttons align flush
+    overflow: 'hidden',
   },
-  itemMeta: { flex: 1 },
-  title: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  time: { fontSize: 12, color: '#6b7280', marginTop: 4 },
-  category: { fontSize: 12, color: '#9ca3af', marginLeft: 8 },
-  empty: { marginTop: 24, textAlign: 'center', color: '#666' },
+  itemContent: {
+    flex: 1,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+  },
+  medicationType: {
+    fontSize: 12,
+    color: '#6b7280',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  dosage: {
+    fontSize: 13,
+    color: '#374151',
+    marginTop: 4,
+  },
+  frequency: {
+    fontSize: 13,
+    color: '#374151',
+    marginTop: 4,
+  },
+  doseTimes: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  dates: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
 
-  /* Swipe actions: positioned so buttons are visible and responsive */
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  empty: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+
+  /* Swipe actions */
   rightActionContainer: {
     flexDirection: 'row',
     alignItems: 'stretch',
     justifyContent: 'flex-end',
-    marginRight: -16, /* pull actions flush to item edge (matches item padding) */
+    marginRight: -16,
   },
   actionButton: {
-    width: 88, /* fixed width ensures side-by-side visibility */
-    height: '100%', /* full height for good tap target */
+    width: 88,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'column',
@@ -265,5 +342,9 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: '#ef4444',
   },
-  actionText: { color: '#fff', marginTop: 6, fontWeight: '600' },
+  actionText: {
+    color: '#fff',
+    marginTop: 6,
+    fontWeight: '600',
+  },
 });
