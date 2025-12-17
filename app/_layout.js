@@ -2,6 +2,7 @@ import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import { Linking } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import RoutineAnchors from "../lib/routineAnchors";
 import { supabase } from "../lib/supabase";
 
 export default function RootLayout() {
@@ -9,6 +10,15 @@ export default function RootLayout() {
   
   useEffect(() => {
     let handled = false; // prevent double-handling on fast refresh
+    
+    // Initialize routine anchors defaults + migrations (Story 1.1)
+    (async () => {
+      try {
+        await RoutineAnchors.initialize();
+      } catch (e) {
+        console.warn('RoutineAnchors init failed', e);
+      }
+    })();
     
     // Handle deep links for password reset
     const handleDeepLink = async (url) => {
