@@ -1,0 +1,19 @@
+# Coverage reports
+jest/coverage/
+*.lcov
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+
+# AI Evals
+ai-evals/results/
+ai-evals/config.json
+
+# Detox
+.detox/
+
+# Test results
+test-results/
+*.log
+

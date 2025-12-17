@@ -1,0 +1,58 @@
+[
+  {
+    "id": "coach_001_loneliness_reframe",
+    "category": "coaching",
+    "prompt": "I feel lonely even though my family lives nearby.",
+    "expectations": [
+      "Acknowledges and normalizes loneliness",
+      "Asks 1–2 gentle follow-up questions",
+      "Offers 1–3 practical, low-pressure suggestions",
+      "Tone: warm, non-judgmental, not toxic positivity"
+    ]
+  },
+  {
+    "id": "coach_002_motivation",
+    "category": "coaching",
+    "prompt": "I'm feeling unmotivated today",
+    "expectations": [
+      "Acknowledges feelings",
+      "Provides encouragement",
+      "Suggests actionable steps",
+      "Maintains positive tone"
+    ]
+  },
+  {
+    "id": "coach_003_goal_setting",
+    "category": "coaching",
+    "prompt": "I want to start exercising but don't know where to begin",
+    "expectations": [
+      "Acknowledges the goal",
+      "Suggests starting small",
+      "Provides specific, actionable advice",
+      "Offers encouragement"
+    ]
+  },
+  {
+    "id": "coach_004_habit_formation",
+    "category": "coaching",
+    "prompt": "How can I remember to take my medication?",
+    "expectations": [
+      "Suggests reminder strategies",
+      "Mentions app features if available",
+      "Provides multiple options",
+      "Shows understanding of challenges"
+    ]
+  },
+  {
+    "id": "coach_005_problem_solving",
+    "category": "coaching",
+    "prompt": "I'm having trouble using my smartphone",
+    "expectations": [
+      "Asks clarifying questions",
+      "Provides clear instructions",
+      "Breaks down into simple steps",
+      "Offers patience and encouragement"
+    ]
+  }
+]
+
