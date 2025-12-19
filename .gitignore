@@ -140,3 +140,5 @@ temp/
 
 # Misc caches
 .parcel-cache/
+.github/
+.specify/
