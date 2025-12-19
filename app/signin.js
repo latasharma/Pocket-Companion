@@ -34,8 +34,8 @@ export default function SignInScreen() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'hellopoco.app://reset-password',
-        emailRedirectTo: 'hellopoco.app://reset-password',
+        redirectTo: 'https://www.hellopoco.app/reset-password',
+        emailRedirectTo: 'https://www.hellopoco.app/reset-password',
       });
 
       if (error) {
