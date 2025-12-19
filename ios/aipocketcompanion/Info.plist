@@ -86,8 +86,10 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>PoCo requires microphone access to do a voice chat with your AI companion.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>&quot;PoCo uses speech recognition to enable voice conversations with the AI bot.&quot;</string>
+	<string>PoCo uses speech recognition to enable voice conversations with the AI bot.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>&quot;PoCo accesses your photo library to let you select and share photos.&quot;</string>
+	<string>PoCo accesses your photo library to let you select and share photos.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>PoCo accesses your camera to let you take the picture of your medications</string>
 </dict>
 </plist>

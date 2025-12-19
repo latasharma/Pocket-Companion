@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Accessibility, hitSlopFor } from '../../constants/Accessibility';
 import MedicationService from '../../lib/medicationService';
 
 /**
@@ -190,11 +191,11 @@ export default function ReminderListScreen({ navigation }) {
     <View style={styles.container}>
       <SafeAreaView style={{ backgroundColor: '#ffffff' }}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} hitSlop={hitSlopFor()}>
             <Ionicons name="arrow-back" size={24} color="#10B981" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Medications</Text>
-          <TouchableOpacity style={styles.addButton} onPress={onAdd}>
+          <TouchableOpacity style={styles.addButton} onPress={onAdd} hitSlop={hitSlopFor()}>
             <Ionicons name="add" size={22} color="#ffffff" />
           </TouchableOpacity>
         </View>
@@ -220,7 +221,7 @@ export default function ReminderListScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: Accessibility.OFF_WHITE_BACKGROUND },
   header: {
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
@@ -232,20 +233,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    padding: 4,
+    padding: 8,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: Accessibility.DARK_TEXT,
     textAlign: 'center',
     flex: 1,
   },
   addButton: {
     backgroundColor: '#10b981',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: Accessibility.BUTTON_MIN_SIZE,
+    height: Accessibility.BUTTON_MIN_SIZE,
+    borderRadius: Math.ceil(Accessibility.BUTTON_MIN_SIZE / 2),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -332,6 +333,7 @@ const styles = StyleSheet.create({
   actionButton: {
     width: 88,
     height: '100%',
+    minWidth: Accessibility.BUTTON_MIN_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'column',

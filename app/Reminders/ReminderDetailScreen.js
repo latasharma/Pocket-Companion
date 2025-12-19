@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Accessibility, hitSlopFor } from '../../constants/Accessibility';
 import MedicationService from '../../lib/medicationService';
 import ReminderScheduler from '../../lib/reminderScheduler';
 import * as SupabaseLib from '../../lib/supabase';
@@ -175,15 +176,36 @@ export default function ReminderDetailScreen({ route, navigation }) {
       ) : null}
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8 }}>
-        <Button title="Edit" onPress={() => navigation?.navigate?.('ReminderForm', { reminderId })} />
-        <Button title="Delete" color="red" onPress={onDelete} />
+        <TouchableOpacity
+          style={[styles.inlineButton, styles.editButton]}
+          onPress={() => navigation?.navigate?.('ReminderForm', { reminderId })}
+          hitSlop={hitSlopFor()}
+          accessibilityLabel="Edit reminder"
+        >
+          <Text style={styles.inlineButtonText}>Edit</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.inlineButton, styles.deleteButton]}
+          onPress={onDelete}
+          hitSlop={hitSlopFor()}
+          accessibilityLabel="Delete reminder"
+        >
+          <Text style={[styles.inlineButtonText, { color: '#fff' }]}>Delete</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={{ marginTop: 8 }}>
         <Text style={styles.label}>Snooze</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8 }}>
           {[5, 10, 30, 60].map((m) => (
-            <TouchableOpacity key={m} style={styles.snoozeBtn} onPress={() => onSnooze(m)}>
+            <TouchableOpacity
+              key={m}
+              style={styles.snoozeBtn}
+              onPress={() => onSnooze(m)}
+              hitSlop={hitSlopFor()}
+              accessibilityLabel={`Snooze ${m} minutes`}
+            >
               <Text style={styles.snoozeText}>{m}m</Text>
             </TouchableOpacity>
           ))}
@@ -191,16 +213,21 @@ export default function ReminderDetailScreen({ route, navigation }) {
       </View>
 
       <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-around' }}>
-        <Button title="Mark as Taken" onPress={markTaken} />
-        <Button title="Mark as Missed" color="red" onPress={markMissed} />
+        <TouchableOpacity style={[styles.actionPrimary]} onPress={markTaken} hitSlop={hitSlopFor()} accessibilityLabel="Mark as taken">
+          <Text style={styles.actionPrimaryText}>Mark as Taken</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.actionDanger]} onPress={markMissed} hitSlop={hitSlopFor()} accessibilityLabel="Mark as missed">
+          <Text style={styles.actionPrimaryText}>Mark as Missed</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  header: { fontSize: 22, fontWeight: '700' },
+  container: { flex: 1, padding: 16, backgroundColor: Accessibility.OFF_WHITE_BACKGROUND },
+  header: { fontSize: 22, fontWeight: '700', color: Accessibility.DARK_TEXT },
   time: { fontSize: 12, color: '#666' },
   label: { fontSize: 12, color: '#666', marginBottom: 4 },
   snoozeBtn: {
@@ -208,6 +235,57 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: '#eee',
     borderRadius: 8,
+    minWidth: Accessibility.BUTTON_MIN_SIZE,
+    minHeight: Accessibility.BUTTON_MIN_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   snoozeText: { fontWeight: '600' },
+
+  /* Inline edit/delete buttons */
+  inlineButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: Accessibility.BUTTON_MIN_SIZE,
+    minHeight: Accessibility.BUTTON_MIN_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inlineButtonText: {
+    fontWeight: '600',
+    color: '#111827',
+  },
+  editButton: {
+    backgroundColor: '#eef2ff',
+  },
+  deleteButton: {
+    backgroundColor: '#ef4444',
+  },
+
+  /* Primary action buttons */
+  actionPrimary: {
+    backgroundColor: '#10b981',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: Accessibility.BUTTON_MIN_SIZE,
+    minHeight: Accessibility.BUTTON_MIN_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionDanger: {
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: Accessibility.BUTTON_MIN_SIZE,
+    minHeight: Accessibility.BUTTON_MIN_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionPrimaryText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
 });
