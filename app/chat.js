@@ -724,6 +724,9 @@ const fetchUserProfile = async () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#10B981" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Chat with {companionName}</Text>
                                 <View style={styles.headerButtons}>
             <TouchableOpacity
