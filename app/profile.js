@@ -372,7 +372,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Reminders</Text>
           <View style={styles.settingsCard}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/Reminders/ReminderListScreen')}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/Reminders/ReminderOnBoardingScreen')}>
               <View style={styles.settingInfo}>
                 <Ionicons name="medkit" size={24} color="#10b981" />
                 <View style={styles.settingText}>

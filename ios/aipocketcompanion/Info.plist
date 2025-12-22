@@ -89,7 +89,13 @@
 	<string>PoCo uses speech recognition to enable voice conversations with the AI bot.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>PoCo accesses your photo library to let you select and share photos.</string>
-  	<key>NSCameraUsageDescription</key>
-  	<string>PoCo accesses your camera to let you take the picture of your medications</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PoCo accesses your camera to let you take the picture of your medications</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PoCo uses your location to show you the current weather and forecast for where you are.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>PoCo uses your location in the background to deliver location-based reminders and timely weather updates.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>PoCo may access location in the background to provide continuous location-based reminders and services.</string>
 </dict>
 </plist>
