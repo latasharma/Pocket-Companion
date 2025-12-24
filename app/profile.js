@@ -383,31 +383,31 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </TouchableOpacity>
  
-            <View style={styles.divider} />
+            {/* <View style={styles.divider} /> */}
  
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reminder-settings')}>
+            {/* <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reminder-settings')}>
               <View style={styles.settingInfo}>
                 <Ionicons name="time" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Appointments</Text>
-                  {/* <Text style={styles.settingDescription}>Configure medication and other reminders</Text> */}
+                  <Text style={styles.settingDescription}>Configure medication and other reminders</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
-            <View style={styles.divider} />
+            {/* <View style={styles.divider} /> */}
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reminder-settings')}>
+            {/* <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reminder-settings')}>
               <View style={styles.settingInfo}>
                 <Ionicons name="calendar" size={24} color="#10b981" />
                 <View style={styles.settingText}>
                   <Text style={styles.settingTitle}>Important Dates</Text>
-                  {/* <Text style={styles.settingDescription}>Configure medication and other reminders</Text> */}
+                  <Text style={styles.settingDescription}>Configure medication and other reminders</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
 

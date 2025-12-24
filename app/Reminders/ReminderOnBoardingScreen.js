@@ -49,7 +49,7 @@ export default function ReminderOnBoardingScreen({ navigation }) {
     try {
       // Try to fetch a server-side draft first (best-effort)
       const { data: serverDraft, error: serverErr } = await supabase
-        .from('reminders')
+        .from('medication_reminders')
         .select('*')
         .contains('metadata', { draft: true })
         .eq('is_deleted', false)
@@ -92,7 +92,7 @@ export default function ReminderOnBoardingScreen({ navigation }) {
       // If server-side draft exists, mark it deleted so it no longer appears
       if (draft && draft.id && !draft._localOnly) {
         try {
-          await supabase.from('reminders').update({ is_deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', draft.id);
+          await supabase.from('medication_reminders').update({ is_deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', draft.id);
         } catch (e) {
           console.warn('Failed to delete server draft', e);
         }
@@ -108,9 +108,12 @@ export default function ReminderOnBoardingScreen({ navigation }) {
   async function loadReminders() {
     setLoading(true);
     try {
+      // Select explicit columns so callers get a stable shape matching the client model
       const { data, error } = await supabase
-        .from('reminders')
-        .select('*')
+        .from('medication_reminders')
+        .select(
+          `id, user_id, title, description, reminder_time, category, notification_types, notify_before_minutes, metadata, repeat_frequency, frequency_type, routine_anchor, status, is_deleted, deleted_at, created_at, updated_at`
+        )
         .eq('is_deleted', false)
         .order('reminder_time', { ascending: true });
 
@@ -119,7 +122,14 @@ export default function ReminderOnBoardingScreen({ navigation }) {
         Alert.alert('Error', 'Could not load reminders.');
         setReminders([]);
       } else {
-        setReminders(Array.isArray(data) ? data : []);
+        // Ensure reminder_time remains an ISO string when present
+        const normalized = Array.isArray(data)
+          ? data.map((r) => ({
+              ...r,
+              reminder_time: r.reminder_time ? new Date(r.reminder_time).toISOString() : null,
+            }))
+          : [];
+        setReminders(normalized);
       }
     } catch (err) {
       console.error('loadReminders failed', err);
@@ -171,7 +181,7 @@ export default function ReminderOnBoardingScreen({ navigation }) {
       end.setDate(end.getDate() + 1);
 
       const { data, error } = await supabase
-        .from('reminders')
+        .from('medication_reminders')
         .select('*')
         .eq('is_deleted', false)
         .eq('status', 'taken')

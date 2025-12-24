@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Image, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Accessibility, hitSlopFor } from '../../constants/Accessibility';
+import { authService } from '../../lib/authService';
 import ReminderScheduler from '../../lib/reminderScheduler';
 import RoutineAnchors from '../../lib/routineAnchors';
 import * as SupabaseLib from '../../lib/supabase';
@@ -17,6 +18,14 @@ const DRAFT_KEY = 'poco:reminder_draft';
 
 // Small helper for ISO timestamps
 const nowISO = () => new Date().toISOString();
+
+function mapCategoryForDB(chip) {
+  if (!chip) return 'other';
+  if (chip === 'medication') return 'medications';
+  if (chip === 'appointment') return 'appointments';
+  if (chip === 'event') return 'other';
+  return chip;
+}
 
 /**
  * Add Reminder Screen
@@ -218,7 +227,7 @@ export default function AddReminderScreen({ navigation }) {
       try {
         // Find an existing draft record (metadata.draft = true) so we update instead of creating duplicates
         const { data: existing, error: fetchErr } = await supabase
-          .from('reminders')
+          .from('medication_reminders')
           .select('*')
           .contains('metadata', { draft: true })
           .eq('is_deleted', false)
@@ -229,7 +238,7 @@ export default function AddReminderScreen({ navigation }) {
         const supPayload = {
           title: draft.title || null,
           description: draft.description || '',
-          category: draft.category || 'draft',
+          category: mapCategoryForDB(draft.category) || 'other',
           reminder_time: draft.reminderTime || null,
           metadata: { ...(draft.metadata || {}), draft: true, source: 'autosave', attachments: draft.attachments || [] },
           status: 'draft',
@@ -239,9 +248,9 @@ export default function AddReminderScreen({ navigation }) {
         };
 
         if (existing && existing.id) {
-          await supabase.from('reminders').update(supPayload).eq('id', existing.id);
+          await supabase.from('medication_reminders').update(supPayload).eq('id', existing.id);
         } else {
-          await supabase.from('reminders').insert([supPayload]);
+          await supabase.from('medication_reminders').insert([supPayload]);
         }
       } catch (e) {
         console.warn('Failed to save draft to supabase', e);
@@ -312,7 +321,7 @@ export default function AddReminderScreen({ navigation }) {
       const payload = {
         title: what.trim(),
         description: '',
-        category: selectedChip || 'other',
+        category: mapCategoryForDB(selectedChip) || 'other',
         notification_types: ['push'],
         notify_before_minutes: 0,
         metadata: {
@@ -413,7 +422,7 @@ export default function AddReminderScreen({ navigation }) {
       if (selectedChip === 'appointment' && payload.reminder_time) {
         try {
           const { data: existing, error: fetchErr } = await supabase
-            .from('reminders')
+            .from('medication_reminders')
             .select('*')
             .eq('reminder_time', payload.reminder_time)
             .eq('is_deleted', false)
@@ -456,11 +465,102 @@ export default function AddReminderScreen({ navigation }) {
       }
 
       // Persist to Supabase
-      const insert = { ...payload, created_at: nowISO(), updated_at: nowISO() };
-      const { data, error } = await supabase.from('reminders').insert([insert]).select().single();
-      if (error) {
-        throw error;
+      let insert = { ...payload, created_at: nowISO(), updated_at: nowISO() };
+
+      // Ensure we set user_id to satisfy RLS policies (reminders.user_id is NOT NULL)
+      try {
+        // Prefer the centralized authService which handles session refreshes reliably
+        const authUser = await authService.getCurrentUser();
+        if (authUser && authUser.id) {
+          insert.user_id = authUser.id;
+        } else {
+          // If we cannot determine the authenticated user, stop early — RLS will reject the insert otherwise.
+          console.warn('AddReminder: unable to determine authenticated user, aborting save to avoid RLS rejection');
+          throw new Error('Authentication required to save reminders. Please sign in and try again.');
+        }
+      } catch (e) {
+        console.warn('AddReminder: authService.getCurrentUser() failed', e);
+        throw e;
       }
+
+      // If reminder_time was set as a routine token (e.g. 'routine:breakfast'), resolve it into an ISO timestamp
+      // because the DB column is TIMESTAMPTZ and cannot accept arbitrary tokens.
+      try {
+        if (typeof insert.reminder_time === 'string' && insert.reminder_time.startsWith('routine:')) {
+          const token = insert.reminder_time.split(':')[1];
+          const canonical = token ? token.charAt(0).toUpperCase() + token.slice(1) : token;
+          try {
+            const anchors = await RoutineAnchors.getAnchors();
+            const timeStr = (anchors && (anchors[canonical] || anchors[token])) || null; // HH:MM:SS
+            if (timeStr) {
+              const parts = timeStr.split(':').map((p) => Number(p));
+              const now = new Date();
+              let candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parts[0], parts[1], parts[2] || 0, 0);
+              if (candidate.getTime() <= Date.now()) {
+                candidate = new Date(candidate.getFullYear(), candidate.getMonth(), candidate.getDate() + 1, parts[0], parts[1], parts[2] || 0, 0);
+              }
+              insert.reminder_time = candidate.toISOString();
+              insert.routine_anchor = canonical;
+            } else {
+              // Fallback to now if anchors unavailable
+              insert.reminder_time = new Date().toISOString();
+              insert.routine_anchor = canonical;
+            }
+          } catch (e) {
+            console.warn('AddReminder: failed to resolve routine token, falling back to now', e);
+            insert.reminder_time = new Date().toISOString();
+          }
+        }
+      } catch (e) {
+        // defensive
+      }
+
+      // Debug: log payload before attempting to persist so we can inspect server-side failures
+      try {
+        // Keep reminder_time as ISO datetime for TIMESTAMPTZ columns.
+        // Normalization for time-only columns (dose_times) is handled in medicationService.createMedication.
+        // No change to insert.reminder_time here — preserve full ISO timestamp.
+        console.log('AddReminder: saving payload', JSON.stringify(insert));
+      } catch (e) {
+        // ignore serialization errors
+      }
+
+      // Attempt insert and capture full response for better diagnostics
+      const insertResp = await supabase.from('medication_reminders').insert([insert]).select().single();
+      // Normalize response (Supabase client sometimes returns shape { data, error } or other wrappers)
+      const respData = insertResp && insertResp.data !== undefined ? insertResp.data : (insertResp?.[0] ?? null);
+      const respError = insertResp && insertResp.error !== undefined ? insertResp.error : (insertResp?.error ?? null);
+      try {
+        console.log('AddReminder: insert response', { respData, respError, raw: insertResp });
+      } catch (e) {
+        // ignore logging errors
+      }
+
+      if (respError) {
+        // Persist raw response to AsyncStorage for developer inspection
+        try {
+          const debugKey = '@poco:last_failed_insert';
+          await AsyncStorage.setItem(debugKey, JSON.stringify({ time: new Date().toISOString(), insert, insertResp }));
+        } catch (e) {
+          console.warn('Failed to persist failed insert response', e);
+        }
+
+        // Show an Alert with a compact representation so devs can copy it from the device
+        try {
+          const rawStr = JSON.stringify(insertResp, Object.getOwnPropertyNames(insertResp)).slice(0, 1000);
+          Alert.alert('Save failed', `Supabase insert failed. Logged response (truncated):\n${rawStr}`);
+        } catch (e) {
+          try { Alert.alert('Save failed', 'Supabase insert failed. (Could not serialize response)'); } catch (e2) {}
+        }
+
+        // Throw a serializable error so outer catch logs show useful info
+        const errMsg = respError?.message || respError?.detail || JSON.stringify(respError) || '{}';
+        const errToThrow = new Error(`Supabase insert failed: ${errMsg}`);
+        try { errToThrow.original = respError; } catch (e) {}
+        throw errToThrow;
+      }
+
+      const data = respData;
 
       // Schedule local notification for this reminder (best-effort)
       try {
@@ -492,8 +592,20 @@ export default function AddReminderScreen({ navigation }) {
       Alert.alert('Saved', 'Reminder saved successfully.');
       router.push('/Reminders/NotificationScreen');
     } catch (err) {
+      // Provide more detailed error feedback for debugging while keeping message user-friendly.
       console.error('onSave error', err);
-      Alert.alert('Error', 'Could not save reminder.');
+      let msg = 'Could not save reminder.';
+      try {
+        // Supabase error objects often include message/detail/code — prefer those if present
+        if (err && typeof err === 'object') {
+          msg += '\n' + (err.message || err.error || err.detail || err.hint || JSON.stringify(err));
+        } else if (err) {
+          msg += '\n' + String(err);
+        }
+      } catch (e) {
+        // ignore serialization errors
+      }
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }

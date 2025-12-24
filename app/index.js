@@ -57,7 +57,7 @@ export default function HomeScreen() {
     if (router && router.addListener) {
       unsub = router.addListener('focus', loadDoneToday);
     }
-    loadDoneToday();
+    // loadDoneToday();
     return () => {
       if (typeof unsub === 'function') unsub();
     };
@@ -224,7 +224,7 @@ export default function HomeScreen() {
         )}
 
         {/* Done Today section: displays completed items for the current day */}
-        <View style={styles.doneTodayContainer}>
+        {/* <View style={styles.doneTodayContainer}>
           <Text style={styles.sectionTitle}>Done Today</Text>
           {doneToday.length === 0 ? (
             <Text style={styles.doneEmpty}>No completed items yet.</Text>
@@ -243,7 +243,7 @@ export default function HomeScreen() {
               </View>
             ))
           )}
-        </View>
+        </View> */}
 
         <View style={styles.optionsContainer}>
           <TouchableOpacity style={styles.optionCard} onPress={handleStartChat}>
@@ -273,20 +273,20 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.footer}>
+        {/* <View style={styles.footer}>
           <Text style={styles.footerText}>
             Your AI companion is ready to help!
           </Text>
-        </View>
+        </View> */}
 
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.fab}
           onPress={() => router.push('/Reminders/ReminderFormScreen')}
           accessibilityRole="button"
         >
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={styles.fabText}>Add</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </SafeAreaView>
   );

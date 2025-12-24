@@ -89,10 +89,10 @@ ForEg: "You started a note about 'Heart Doctor'. Do you want to set a time?"
    7. Implement the Snooze pattern:
       7.1 - If the user always snoozes their 8:00 AM "Breakfast" reminder to 9:00 AM three days in a row: On the fourth day, the app should displays a polite prompt: "I noticed you usually take your morning pills around 9:00 AM. Should we change your 'Morning' time to 9:00 AM permanently?"
 10. Create a new screen which will be used as a Setup Wizard for setting up the default times of Breakfast | Lunch | Dinner | Bedtime. Store all the necessary details in to supabase database (use the current structure of supabase database). so that it can be retrieved when needed. The setup wizard should follow below 4 points:
-   1. "What time do you usually have coffee/breakfast?" 
-   2. "What time do you eat lunch?" 
-   3. "What time is dinner?" 
-   4. "What time do you go to bed?"
+   1. What time do you usually have coffee/breakfast?
+   2. What time do you eat lunch?
+   3. What time is dinner?
+   4. What time do you go to bed?
 11. Optional Details card (collapsible)
    1. Build collapsible “Add Photo or Details (Optional)” section.
    2. Medication details: camera capture + store photo reference; color swatches.
