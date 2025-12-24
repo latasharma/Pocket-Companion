@@ -91,6 +91,10 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleOpenReminders = () => {
+    router.push('/Reminders/ShowReminderOptionsScreen');
+  };
+
   const handleSaveProfile = async () => {
     if (!firstName.trim() || !lastName.trim() || !companionName.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -361,6 +365,17 @@ export default function ProfileScreen() {
                 <Ionicons name="chatbubbles" size={24} color="#10b981" />
                 <Text style={styles.quickActionText}>Chat with {companionName || 'Pixel'}</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Reminders</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity style={styles.quickActionButton} onPress={handleOpenReminders}>
+              <Ionicons name="alarm" size={24} color="#10b981" />
+              <Text style={styles.menuItemText}>Manage Reminders</Text>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
             </TouchableOpacity>
           </View>
