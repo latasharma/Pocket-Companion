@@ -42,11 +42,16 @@ export default function ChatScreen() {
 
     const initializeApp = async () => {
       try {
-        fetchUserProfile();
-        initializeMemorySystem();
-        initializeVoiceService();
-        initializeVoiceInput();
-        initializeDeviceId();
+        // Load memory (DB/AsyncStorage) first so we don't overwrite an existing
+        // conversation with a welcome message. After memory is loaded we then
+        // load the user profile which may set companionName/voice prefs.
+        await initializeMemorySystem();
+        await fetchUserProfile();
+
+        // Initialize other services after profile/memory are ready
+        await initializeVoiceService();
+        await initializeVoiceInput();
+        await initializeDeviceId();
         
         // Set up auth state change listener
         console.log('🔐 Setting up auth listener in useEffect');
@@ -60,7 +65,10 @@ export default function ChatScreen() {
             setCompanionName('Pixel');
           } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
             console.log('🔄 User session updated:', event);
+            // Refresh profile; do not block the listener
             fetchUserProfile();
+            // Also re-load memory to pick up any server-side changes
+            initializeMemorySystem();
           }
         });
         
@@ -98,29 +106,43 @@ export default function ChatScreen() {
   // Initialize memory system and load chat history
   const initializeMemorySystem = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Try to get current user (this will refresh token if necessary)
+      let user = await authService.getCurrentUser();
+
+      // If no user yet, attempt a refresh once to recover short-lived token races
+      if (!user) {
+        console.log('No user from authService initially, attempting session refresh...');
+        await authService.refreshSession();
+        user = await authService.getCurrentUser();
+      }
+
       if (user) {
         console.log('Initializing memory system for user:', user.id);
-        
-        // Initialize memory system for new users
+
+        // Initialize memory system for new users (safe - doesn't wipe history)
         await MemoryService.initializeUserMemory(user.id);
-        
-        // Load recent conversations
-        const conversations = await MemoryService.loadConversations(user.id, 1);
+
+        // Load recent conversations (request a larger history for full chat display)
+        const conversations = await MemoryService.loadConversations(user.id, 50);
         console.log('Loaded conversations from database:', conversations?.length || 0);
-        
-        if (conversations && conversations.length > 0) {
+
+        if (Array.isArray(conversations) && conversations.length > 0) {
+          // Ensure messages are in expected format (array of message objects)
           setMessages(conversations);
           console.log('Set messages from database');
         } else {
           // If no database conversations, try AsyncStorage
           console.log('No database conversations, trying AsyncStorage...');
-          await loadChatHistoryFromStorage();
+          await loadChatHistoryFromStorage(user.id);
         }
+      } else {
+        // As a last resort, try to load any local AsyncStorage chat (may exist for this device)
+        console.log('No authenticated user available; attempting to load any local AsyncStorage chat');
+        await loadChatHistoryFromStorage();
       }
     } catch (error) {
       console.error('Error initializing memory system:', error);
-      // Fallback to AsyncStorage
+      // Fallback to AsyncStorage (try to load without user id)
       await loadChatHistoryFromStorage();
     }
   };
@@ -144,7 +166,19 @@ export default function ChatScreen() {
   // Save chat history to database and storage
   const saveChatHistory = async (newMessages) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Prefer the authService which handles session refreshes reliably
+      let user = await authService.getCurrentUser();
+
+      // Fallback to supabase auth.getUser() if authService didn't return a user
+      if (!user) {
+        try {
+          const { data: { user: sbUser } } = await supabase.auth.getUser();
+          user = sbUser;
+        } catch (e) {
+          console.warn('saveChatHistory - supabase.auth.getUser() fallback failed:', e);
+        }
+      }
+
       if (user) {
         // Save to database
         console.log('Saving conversation to database for user:', user.id);
@@ -152,17 +186,24 @@ export default function ChatScreen() {
         
         // Also save to AsyncStorage as backup
         await AsyncStorage.setItem(`chat_history_${user.id}`, JSON.stringify(newMessages));
+      } else {
+        // If no authenticated user, still persist to device for eventual recovery
+        try {
+          const tempKey = 'chat_history_anonymous';
+          await AsyncStorage.setItem(tempKey, JSON.stringify(newMessages));
+          console.log('Saved chat history to anonymous AsyncStorage key');
+        } catch (storageError) {
+          console.error('Error saving to AsyncStorage (anonymous):', storageError);
+        }
       }
     } catch (error) {
       console.error('Error saving chat history:', error);
-      // Fallback to AsyncStorage only
+      // As a final fallback, save to device storage
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await AsyncStorage.setItem(`chat_history_${user.id}`, JSON.stringify(newMessages));
-        }
+        const tempKey = 'chat_history_anonymous';
+        await AsyncStorage.setItem(tempKey, JSON.stringify(newMessages));
       } catch (storageError) {
-        console.error('Error saving to AsyncStorage:', storageError);
+        console.error('Error saving fallback chat history to AsyncStorage:', storageError);
       }
     }
   };
@@ -270,16 +311,28 @@ const fetchUserProfile = async () => {
     
     if (!user) {
         console.log('❌ No authenticated user found');
-        // Show a welcome message if not logged in
-        if (!messages || messages.length === 0) {
-          const welcomeMessage = {
-            id: Date.now(),
-            text: "Hi there! It's Pixel here. Please log in to continue our conversation.",
-            sender: 'ai',
-            timestamp: new Date().toISOString(),
-          };
-          setMessages([welcomeMessage]);
+        // Try to load any anonymous local chat first to avoid overwriting
+        try {
+          const anonStored = await AsyncStorage.getItem('chat_history_anonymous');
+          if (anonStored) {
+            const parsed = JSON.parse(anonStored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setMessages(parsed);
+              console.log('Loaded anonymous chat from AsyncStorage');
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Error checking anonymous AsyncStorage:', e);
         }
+        // No local chat found — show a welcome message
+        const welcomeMessage = {
+          id: Date.now(),
+          text: "Hi there! It's Pixel here. Please log in to continue our conversation.",
+          sender: 'ai',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages([welcomeMessage]);
         return;
       }
 
@@ -306,30 +359,101 @@ const fetchUserProfile = async () => {
         VoiceService.setVoiceEnabled(voicePref);
         console.log('🎙️ Voice preference loaded:', voicePref);
         
-        // Only set welcome message if no existing messages
-        if (!messages || messages.length === 0) {
-          const welcomeMessage = {
-            id: Date.now(),
-            text: `Hi ${profile.first_name || 'there'}! It's ${companionNameToUse} here. I'm happy to chat with you! How's your day going?`,
-            sender: 'ai',
-            timestamp: new Date().toISOString(),
-          };
-          setMessages([welcomeMessage]);
-          saveChatHistory([welcomeMessage]);
-          console.log('🎯 Welcome message set');
+        // Only set welcome message if there is no existing conversation saved
+        try {
+          const existingConversations = await MemoryService.loadConversations(user.id, 50);
+          if (Array.isArray(existingConversations) && existingConversations.length > 0) {
+            // Use conversations loaded from DB (initializeMemorySystem already set state when available)
+            console.log('Existing conversations found in DB; not setting welcome message');
+          } else {
+            // Check AsyncStorage backup before creating a new welcome message
+            const stored = await AsyncStorage.getItem(`chat_history_${user.id}`);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setMessages(parsed);
+                console.log('Loaded chat history from AsyncStorage backup');
+              } else {
+                const welcomeMessage = {
+                  id: Date.now(),
+                  text: `Hi ${profile.first_name || 'there'}! It's ${companionNameToUse} here. I'm happy to chat with you! How's your day going?`,
+                  sender: 'ai',
+                  timestamp: new Date().toISOString(),
+                };
+                setMessages([welcomeMessage]);
+                try {
+                  await saveChatHistory([welcomeMessage]);
+                  console.log('🎯 Welcome message saved');
+                } catch (saveErr) {
+                  console.warn('⚠️ Failed to save welcome message:', saveErr);
+                }
+              }
+            } else {
+              const welcomeMessage = {
+                id: Date.now(),
+                text: `Hi ${profile.first_name || 'there'}! It's ${companionNameToUse} here. I'm happy to chat with you! How's your day going?`,
+                sender: 'ai',
+                timestamp: new Date().toISOString(),
+              };
+              setMessages([welcomeMessage]);
+              try {
+                await saveChatHistory([welcomeMessage]);
+                console.log('🎯 Welcome message saved');
+              } catch (saveErr) {
+                console.warn('⚠️ Failed to save welcome message:', saveErr);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Error checking existing conversations before welcome:', err);
         }
       } else {
         console.log('⚠️ No profile found for user');
-        // Set default welcome if no profile
-        if (!messages || messages.length === 0) {
-          const welcomeMessage = {
-            id: Date.now(),
-            text: "Hi there! It's Pixel here. I'm happy to chat with you! How's your day going?",
-            sender: 'ai',
-            timestamp: new Date().toISOString(),
-          };
-          setMessages([welcomeMessage]);
-          saveChatHistory([welcomeMessage]);
+        // Set default welcome if no profile and no existing conversations
+        try {
+          const existingConversations = await MemoryService.loadConversations(user.id, 50);
+          if (Array.isArray(existingConversations) && existingConversations.length > 0) {
+            console.log('Existing conversations found; skipping default welcome');
+          } else {
+            const stored = await AsyncStorage.getItem(`chat_history_${user.id}`);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setMessages(parsed);
+                console.log('Loaded chat history from AsyncStorage backup (no profile)');
+              } else {
+                const welcomeMessage = {
+                  id: Date.now(),
+                  text: "Hi there! It's Pixel here. I'm happy to chat with you! How's your day going?",
+                  sender: 'ai',
+                  timestamp: new Date().toISOString(),
+                };
+                setMessages([welcomeMessage]);
+                try {
+                  await saveChatHistory([welcomeMessage]);
+                  console.log('🎯 Default welcome saved');
+                } catch (saveErr) {
+                  console.warn('⚠️ Failed to save default welcome message:', saveErr);
+                }
+              }
+            } else {
+              const welcomeMessage = {
+                id: Date.now(),
+                text: "Hi there! It's Pixel here. I'm happy to chat with you! How's your day going?",
+                sender: 'ai',
+                timestamp: new Date().toISOString(),
+              };
+              setMessages([welcomeMessage]);
+              try {
+                await saveChatHistory([welcomeMessage]);
+                console.log('🎯 Default welcome saved');
+              } catch (saveErr) {
+                console.warn('⚠️ Failed to save default welcome message:', saveErr);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Error checking existing conversations before default welcome:', err);
         }
       }
     } catch (error) {
@@ -342,6 +466,12 @@ const fetchUserProfile = async () => {
         timestamp: new Date().toISOString(),
       };
       setMessages([welcomeMessage]);
+      try {
+        await saveChatHistory([welcomeMessage]);
+        console.log('🎯 Fallback welcome saved');
+      } catch (saveErr) {
+        console.warn('⚠️ Failed to save fallback welcome message:', saveErr);
+      }
     }
   };
 
@@ -724,6 +854,9 @@ const fetchUserProfile = async () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#10B981" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Chat with {companionName}</Text>
                                 <View style={styles.headerButtons}>
             <TouchableOpacity
