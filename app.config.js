@@ -14,13 +14,16 @@ export default {
       supportsTablet: true,
       bundleIdentifier: 'com.hellopoco.poco',
       infoPlist: {
-        ITSAppUsesNonExemptEncryption: false
+        ITSAppUsesNonExemptEncryption: false,
+        NSCalendarsUsageDescription: "PoCo needs access to your calendar to import appointments.",
+        NSRemindersUsageDescription: "PoCo needs access to your reminders to manage your important dates.",
       }
     },
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/images/adaptive-icon.png',
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        permissions: ["READ_CALENDAR"]
       },
       edgeToEdgeEnabled: true
     },

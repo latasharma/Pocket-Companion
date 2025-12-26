@@ -1,6 +1,5 @@
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
-// import * as Calendar from 'expo-calendar';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import RNCalendarEvents from 'react-native-calendar-events';
 import { supabase } from '../../lib/supabase';
 
 // Simple Appointments screen implementing the requirements from docs/reminder-redesign.md (section 5)
@@ -87,21 +87,131 @@ export default function Appointments() {
     }
   }
 
+
+  function getEventType(event) {
+    const title = (event.title || '').toLowerCase();
+    const calendarName = (event.calendar?.title || '').toLowerCase();
+
+    // 🎂 Birthday
+    if (
+      event.allDay &&
+      (calendarName.includes('birthday') || title.includes('birthday'))
+    ) {
+      return 'Birthday';
+    }
+
+    // 🏖 All-day / Holiday
+    if (event.allDay) {
+      return 'All Day';
+    }
+
+    // 🧑‍💼 Meeting / Call
+    if (
+      title.includes('meeting') ||
+      title.includes('call') ||
+      title.includes('sync') ||
+      title.includes('standup')
+    ) {
+      return 'Meeting';
+    }
+
+    // 🏥 Appointment
+    if (
+      title.includes('doctor') ||
+      title.includes('clinic') ||
+      title.includes('hospital')
+    ) {
+      return 'Appointment';
+    }
+
+    // 📅 Default
+    return 'Event';
+  }
+
+
+
   // Try to fetch events from device calendar using expo-calendar if available.
   // This attempts to request permissions, fetch calendars and events and fill the form with the first found event.
   async function importFromCalendar() {
-    let Calendar;
     try {
-      // dynamic import so the app doesn't crash if expo-calendar isn't installed
-      //Calendar = require('expo-calendar');
-      Alert.alert('Not available', 'Calendar access is not available in this build.');
-      return;
-    } catch (err) {
-      Alert.alert('Not available', 'Calendar access is not available in this build.');
-      return;
-    }
+      // 1. Request permission
+      const permission = await RNCalendarEvents.requestPermissions();
 
+      if (permission !== 'authorized') {
+        Alert.alert(
+          'Permission denied',
+          'Calendar permission is required to import appointments.'
+        );
+        return;
+      }
+
+      // 2. Define time range
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 1);
+
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 6);
+
+      // 3. Fetch events
+      const events = await RNCalendarEvents.fetchAllEvents(
+        startDate.toISOString(),
+        endDate.toISOString()
+      );
+
+      if (!events.length) {
+        Alert.alert('No events found');
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 4. Map to Supabase schema
+      // 4. Map to Supabase schema and deduplicate by external_event_id to avoid upsert conflicts
+      const uniqueEvents = [];
+      const seen = new Set();
+      for (const ev of events) {
+        // Prefer external event id when available; otherwise use a combination of title+startDate
+        const key = ev.id ?? `${ev.title ?? ''}::${ev.startDate ?? ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        uniqueEvents.push(ev);
+      }
+
+      const payload = uniqueEvents.map((event) => ({
+        user_id: user.id,
+        title: event.title || 'Untitled Event',
+        datetime: event.startDate,
+        location: event.location || null,
+        source: 'calendar',
+        external_event_id: event.id,
+        event_type: getEventType(event),
+        created_at: new Date().toISOString()
+      }));
+
+      // 5. Insert (use upsert to avoid duplicates)
+      // Make sure we don't send multiple rows with the same (user_id, external_event_id) key —
+      // that causes Postgres to attempt to update the same row multiple times in one command.
+      const { error } = await supabase
+        .from('appointments')
+        .upsert(payload, {
+          onConflict: 'user_id,external_event_id'
+        });
+
+      if (error) {
+        console.error(error);
+        Alert.alert('Error importing events');
+        return;
+      }
+
+      Alert.alert('Success', `${payload.length} events imported`);
+      fetchAppointments();
+
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Calendar error', 'Failed to read calendar events.');
+    }
   }
+
 
   function formatDateString(datetime) {
     if (!datetime) return '';
@@ -111,16 +221,63 @@ export default function Appointments() {
     return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
   }
 
+  function getEventUI(type) {
+    switch (type) {
+      case 'Birthday':
+        return { icon: 'gift-outline', color: '#ec4899' };
+
+      case 'Meeting':
+        return { icon: 'people-outline', color: '#3b82f6' };
+
+      case 'Appointment':
+        return { icon: 'medkit-outline', color: '#10b981' };
+
+      case 'All Day':
+        return { icon: 'sunny-outline', color: '#f59e0b' };
+
+      default:
+        return { icon: 'calendar-outline', color: '#6b7280' };
+    }
+  }
+
   function renderAppointmentItem({ item }) {
     const formattedDate = formatDateString(item.datetime);
+    const { icon, color } = getEventUI(item.event_type);
+
     return (
       <View style={styles.appointmentCard}>
-        <Text style={styles.appointmentTitle}>{item.title}</Text>
+        <View style={styles.row}>
+          {/* Icon + Title tightly grouped */}
+          <View style={styles.titleWithIcon}>
+            <Ionicons
+              name={icon}
+              size={18}
+              color={color}
+              style={styles.eventIcon}
+            />
+            <Text style={styles.appointmentTitle}>
+              {item.title}
+            </Text>
+          </View>
+
+          {/* Event type badge */}
+          {item.event_type && (
+            <View style={[styles.badge, { backgroundColor: `${color}20` }]}>
+              <Text style={[styles.badgeText, { color }]}>
+                {item.event_type}
+              </Text>
+            </View>
+          )}
+        </View>
+
         <Text style={styles.appointmentMeta}>{formattedDate}</Text>
-        {item.location ? <Text style={styles.appointmentMeta}>{item.location}</Text> : null}
+        {item.location ? (
+          <Text style={styles.appointmentMeta}>{item.location}</Text>
+        ) : null}
       </View>
     );
   }
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -377,5 +534,32 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontWeight: '600',
     fontSize: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  titleWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0, // prevents text overflow issues
+  },
+
+  eventIcon: {
+    marginRight: 6, // tight spacing next to title
+  },
+
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
