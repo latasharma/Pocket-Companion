@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Image, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Image, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -74,6 +74,20 @@ export default function MedicationsScreen() {
     router.back();
   };
 
+  const renderMedItem = ({ item }) => (
+    <View style={styles.medItem}>
+      <ThemedText style={[styles.medName, { fontFamily: uiFontFamily }]}>{item.name}</ThemedText>
+      <ThemedText style={[styles.medDetail, { fontFamily: uiFontFamily }]}>{item.dosage || ''}</ThemedText>
+    </View>
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.placeholderBox}>
+      <ThemedText style={[styles.placeholderTitle, { fontFamily: uiFontFamily }]}>No medications yet</ThemedText>
+      <ThemedText style={[styles.placeholderSubtitle, { fontFamily: uiFontFamily }]}>You can scan a medicine or add it manually</ThemedText>
+    </View>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: background }}>
       <ThemedView style={styles.container}>
@@ -95,7 +109,10 @@ export default function MedicationsScreen() {
               onPress={handleScan}
               accessibilityLabel="Scan medicine"
             >
-              <ThemedText type="defaultSemiBold" style={[styles.actionText, { fontFamily: uiFontFamily, color: '#fff' }]}>Scan</ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="scan-sharp" size={18} color="#fff" style={{ marginRight: 8 }} />
+                <ThemedText type="defaultSemiBold" style={[styles.actionText, { fontFamily: uiFontFamily, color: '#fff' }]}>Scan</ThemedText>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -103,7 +120,10 @@ export default function MedicationsScreen() {
               onPress={goToManual}
               accessibilityLabel="Add medicine manually"
             >
-              <ThemedText type="defaultSemiBold" style={[styles.actionText, { fontFamily: uiFontFamily, color: '#fff' }]}>Manual</ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="pencil" size={18} color="#fff" style={{ marginRight: 8 }} />
+                <ThemedText type="defaultSemiBold" style={[styles.actionText, { fontFamily: uiFontFamily, color: '#fff' }]}>Manual</ThemedText>
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -123,18 +143,16 @@ export default function MedicationsScreen() {
 
             {loading ? (
               <ThemedText style={[styles.placeholderText, { fontFamily: uiFontFamily }]}>Loading...</ThemedText>
-            ) : medications.length === 0 ? (
-              <View style={styles.placeholderBox}>
-                <ThemedText style={[styles.placeholderTitle, { fontFamily: uiFontFamily }]}>No medications yet</ThemedText>
-                <ThemedText style={[styles.placeholderSubtitle, { fontFamily: uiFontFamily }]}>You can scan a medicine or add it manually</ThemedText>
-              </View>
             ) : (
-              medications.map((m) => (
-                <View key={m.id} style={styles.medItem}>
-                  <ThemedText style={[styles.medName, { fontFamily: uiFontFamily }]}>{m.name}</ThemedText>
-                  <ThemedText style={[styles.medDetail, { fontFamily: uiFontFamily }]}>{m.dosage || ''}</ThemedText>
-                </View>
-              ))
+              <FlatList
+                data={medications}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={renderMedItem}
+                ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+                ListEmptyComponent={renderEmpty}
+                contentContainerStyle={medications.length === 0 ? { flex: 1 } : { paddingBottom: 8 }}
+                showsVerticalScrollIndicator={false}
+              />
             )}
           </View>
 
@@ -183,7 +201,7 @@ const styles = StyleSheet.create({
   placeholderTitle: { fontSize: 18, fontWeight: '600', color: '#6b7280', marginBottom: 6 },
   placeholderSubtitle: { fontSize: 14, color: '#9ca3af' },
   placeholderText: { color: '#6b7280' },
-  medItem: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10 },
+  medItem: { backgroundColor: '#fafafa', borderRadius: 12, padding: 12, marginBottom: 10 },
   medName: { fontWeight: '600', color: '#1f2937' },
   medDetail: { color: '#6b7280' },
   photoPreview: { marginBottom: 12, alignSelf: 'stretch' },

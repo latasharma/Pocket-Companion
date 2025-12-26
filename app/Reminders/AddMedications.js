@@ -34,8 +34,11 @@ export default function AddMedicationsScreen() {
     }
 
     setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
     try {
       const payload = {
+        user_id: user.id,
         name: name.trim(),
         dosage: dosage.trim() || null,
         notes: notes.trim() || null,

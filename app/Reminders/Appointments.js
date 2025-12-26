@@ -9,7 +9,6 @@ import {
   Modal,
   Platform,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -60,9 +59,11 @@ export default function Appointments() {
       Alert.alert('Missing fields', 'Please enter at least a title and date/time.');
       return;
     }
-
+    const { data: { user } } = await supabase.auth.getUser();
+    
     try {
       const payload = {
+        user_id: user.id,
         title,
         datetime,
         location,
@@ -102,11 +103,20 @@ export default function Appointments() {
 
   }
 
+  function formatDateString(datetime) {
+    if (!datetime) return '';
+    const d = new Date(datetime);
+    if (isNaN(d.getTime())) return datetime; // fallback to original string if parsing fails
+    const pad = (n) => (n < 10 ? '0' + n : String(n));
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  }
+
   function renderAppointmentItem({ item }) {
+    const formattedDate = formatDateString(item.datetime);
     return (
       <View style={styles.appointmentCard}>
         <Text style={styles.appointmentTitle}>{item.title}</Text>
-        <Text style={styles.appointmentMeta}>{item.datetime}</Text>
+        <Text style={styles.appointmentMeta}>{formattedDate}</Text>
         {item.location ? <Text style={styles.appointmentMeta}>{item.location}</Text> : null}
       </View>
     );
@@ -122,11 +132,14 @@ export default function Appointments() {
           <ThemedText type="title" style={[styles.headerTitle, { fontFamily: uiFontFamily }]}>Appointments</ThemedText>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.content}>
           {/* Top actions: Access Calendar / Email and Manual (moved above Added Appointments) */}
           <View style={styles.topActions}>
             <TouchableOpacity style={[styles.saveButton, { backgroundColor: '#10b981' }]} onPress={importFromCalendar}>
-              <ThemedText type="defaultSemiBold" style={[styles.saveButtonText, { color: '#fff' }]}>Access Calendar</ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="calendar" size={18} color="#fff" style={{ marginRight: 8 }} />
+                <ThemedText type="defaultSemiBold" style={[styles.saveButtonText, { color: '#fff' }]}>Access Calendar</ThemedText>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -135,7 +148,10 @@ export default function Appointments() {
                 setShowManualDialog(true);
               }}
             >
-              <ThemedText type="defaultSemiBold" style={[styles.saveButtonText, { color: '#fff' }]}>Manual</ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="pencil" size={18} color="#fff" style={{ marginRight: 8 }} />
+                <ThemedText type="defaultSemiBold" style={[styles.saveButtonText, { color: '#fff' }]}>Manual</ThemedText>
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -148,6 +164,7 @@ export default function Appointments() {
               data={appointments}
               keyExtractor={(i) => String(i.id)}
               renderItem={renderAppointmentItem}
+              contentContainerStyle={styles.listContent}
               style={styles.list}
             />
           ) : (
@@ -182,7 +199,7 @@ export default function Appointments() {
               </View>
             </View>
           </Modal>
-        </ScrollView>
+        </View>
 
         {/* Bottom actions removed (buttons moved above). */}
       </View>
@@ -239,6 +256,10 @@ const styles = StyleSheet.create({
   },
   list: {
     marginBottom: 12,
+  },
+  listContent: {
+    paddingTop: 0,
+    paddingBottom: 160,
   },
   appointmentCard: {
     backgroundColor: '#fafafa',

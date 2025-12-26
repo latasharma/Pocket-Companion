@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -38,7 +38,7 @@ export default function ImportantDatesScreen() {
   async function fetchImportantDates() {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('importantDates').select('*').order('id', { ascending: false });
+      const { data, error } = await supabase.from('important_dates').select('*').order('id', { ascending: false });
       if (error) {
         console.warn('Supabase fetch importantDates error:', error);
         //Alert.alert('Error', 'Unable to fetch important dates from the database.');
@@ -113,14 +113,17 @@ export default function ImportantDatesScreen() {
     }
 
     setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
     try {
       const payload = {
+        user_id: user.id,
         title: title.trim(),
         date: date.trim(),
         created_at: new Date().toISOString(),
       };
 
-      const { data, error } = await supabase.from('importantDates').insert([payload]).select();
+      const { data, error } = await supabase.from('important_dates').insert([payload]).select();
       if (error) {
         console.error('Supabase insert error', error);
         Alert.alert('Error', 'Unable to save the date.');
@@ -143,10 +146,31 @@ export default function ImportantDatesScreen() {
   };
 
   function renderItem({ item }) {
+    const formatDate = (d) => {
+      if (!d) return '';
+      // handle common YYYY-MM-DD or YYYY/MM/DD formats without relying on Date parsing
+      const isoMatch = /^(\d{4})[-/](\d{2})[-/](\d{2})/.exec(d);
+      if (isoMatch) {
+        return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+      }
+
+      // fallback to Date parsing for other formats
+      const parsed = new Date(d);
+      if (!isNaN(parsed.getTime())) {
+        const dd = String(parsed.getDate()).padStart(2, '0');
+        const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+        const yyyy = parsed.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      }
+
+      // if all else fails, return the original string
+      return d;
+    };
+
     return (
       <View style={styles.itemCard}>
         <ThemedText style={styles.itemTitle}>{item.title}</ThemedText>
-        <ThemedText style={styles.itemMeta}>{item.date}</ThemedText>
+        <ThemedText style={styles.itemMeta}>{formatDate(item.date)}</ThemedText>
       </View>
     );
   }
@@ -162,114 +186,133 @@ export default function ImportantDatesScreen() {
           <View style={styles.appBarRight} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.topActions}>
-            <TouchableOpacity style={[styles.topActionButton, { backgroundColor: '#10b981' }]} onPress={() => {
-              setShowVoiceDialog(true);
-              setShowManualDialog(false);
-              setShowManualForm(false);
-            }}>
-              <ThemedText type="defaultSemiBold" style={[styles.topActionButtonText, { color: '#fff' }]}>🎤 Add Voice</ThemedText>
-            </TouchableOpacity>
-      
-            <TouchableOpacity style={[styles.topActionButton, { backgroundColor: '#10b981', marginTop: 8 }]} onPress={() => {
-              setShowManualDialog(true);
-              setShowVoiceForm(false);
-              setShowManualForm(false);
-            }}>
-              <ThemedText type="defaultSemiBold" style={[styles.topActionButtonText, { color: '#fff' }]}>✍️ Manual</ThemedText>
-            </TouchableOpacity>
+        <View style={styles.listCard}>
+          <FlatList
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            data={importantDates}
+            keyExtractor={(i) => String(i.id)}
+            renderItem={renderItem}
+            ListHeaderComponent={() => (
+              <>
+                <View style={styles.topActions}>
+                  <TouchableOpacity style={[styles.topActionButton, { backgroundColor: '#10b981' }]} onPress={() => {
+                    setShowVoiceDialog(true);
+                    setShowManualDialog(false);
+                    setShowManualForm(false);
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="mic" size={18} color="#fff" style={{ marginRight: 8 }} />
+                      <ThemedText type="defaultSemiBold" style={[styles.topActionButtonText, { color: '#fff' }]}>Add Voice</ThemedText>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={[styles.topActionButton, { backgroundColor: '#10b981', marginTop: 8 }]} onPress={() => {
+                    setShowManualDialog(true);
+                    setShowVoiceForm(false);
+                    setShowManualForm(false);
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="pencil" size={18} color="#fff" style={{ marginRight: 8 }} />
+                      <ThemedText type="defaultSemiBold" style={[styles.topActionButtonText, { color: '#fff' }]}>Manual</ThemedText>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                <ThemedText type="subtitle" style={[styles.sectionTitle, { color: textColor }]}>Added Important Dates</ThemedText>
+
+              </>
+            )}
+            ListEmptyComponent={() => (
+              loading ? (
+                <ThemedText style={styles.placeholderText}>Loading...</ThemedText>
+              ) : (
+                <View style={styles.placeholderBox}>
+                  <ThemedText style={styles.placeholderTitle}>No important dates yet</ThemedText>
+                  <ThemedText style={styles.placeholderSubtitle}>You can add an important date using voice or manually</ThemedText>
+                </View>
+              )
+            )}
+            style={styles.list}
+          />
+        </View>
+
+        {/* Voice / Manual forms (rendered outside the scrollable list to avoid nested VirtualizedLists) */}
+        {showManualForm && (
+          <View style={styles.formCard}>
+            <ThemedText style={styles.formLabel}>Title</ThemedText>
+            <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Anniversary" style={[styles.input, { color: textColor }]} />
+
+            <ThemedText style={styles.formLabel}>Date</ThemedText>
+            <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.input, { color: textColor }]} />
           </View>
-          <ThemedText type="subtitle" style={[styles.sectionTitle, { color: textColor }]}>Added Important Dates</ThemedText>
+        )}
 
-          {loading ? (
-            <ThemedText style={styles.placeholderText}>Loading...</ThemedText>
-          ) : importantDates && importantDates.length > 0 ? (
-            <FlatList data={importantDates} keyExtractor={(i) => String(i.id)} renderItem={renderItem} style={styles.list} />
-          ) : (
-            <View style={styles.placeholderBox}>
-              <ThemedText style={styles.placeholderTitle}>No important dates yet</ThemedText>
-              <ThemedText style={styles.placeholderSubtitle}>You can add an important date using voice or manually</ThemedText>
-            </View>
-          )}
+        {showVoiceDialog && (
+          <Modal visible={showVoiceDialog} animationType="slide" transparent={true} onRequestClose={() => setShowVoiceDialog(false)}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <ThemedText style={styles.modalTitle}>Add Important Date (Voice)</ThemedText>
 
-          {/* Voice / Manual forms */}
-          {showVoiceDialog && (
-            <Modal visible={showVoiceDialog} animationType="slide" transparent={true} onRequestClose={() => setShowVoiceDialog(false)}>
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <ThemedText style={styles.modalTitle}>Add Important Date (Voice)</ThemedText>
-
-                  <ThemedText style={styles.label}>Title</ThemedText>
-                  <View style={styles.row}>
-                    <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Mom's Birthday" style={[styles.modalInput, { color: textColor, flex: 1 }]} />
-                    <TouchableOpacity
-                      style={[styles.micButton, isRecording && recordingField === 'title' ? styles.micRecording : null]}
-                      onPress={() => (isRecording && recordingField === 'title' ? stopVoice() : startVoiceForField('title'))}
-                    >
-                      <Ionicons name="mic" size={20} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <ThemedText style={styles.label}>Date</ThemedText>
-                  <View style={styles.row}>
-                    <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.modalInput, { color: textColor, flex: 1 }]} />
-                    <TouchableOpacity
-                      style={[styles.micButton, isRecording && recordingField === 'date' ? styles.micRecording : null]}
-                      onPress={() => (isRecording && recordingField === 'date' ? stopVoice() : startVoiceForField('date'))}
-                    >
-                      <Ionicons name="mic" size={20} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={handleSave} accessibilityLabel="Save The Date">
-                    <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : 'Save The Date'}</ThemedText>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.cancelButton} onPress={() => setShowVoiceDialog(false)} accessibilityLabel="Cancel">
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                <ThemedText style={styles.label}>Title</ThemedText>
+                <View style={styles.row}>
+                  <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Mom's Birthday" style={[styles.modalInput, { color: textColor, flex: 1 }]} />
+                  <TouchableOpacity
+                    style={[styles.micButton, isRecording && recordingField === 'title' ? styles.micRecording : null]}
+                    onPress={() => (isRecording && recordingField === 'title' ? stopVoice() : startVoiceForField('title'))}
+                  >
+                    <Ionicons name="mic" size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
-              </View>
-            </Modal>
-          )}
 
-          {showManualForm && (
-            <View style={styles.formCard}>
-              <ThemedText style={styles.formLabel}>Title</ThemedText>
-              <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Anniversary" style={[styles.input, { color: textColor }]} />
-
-              <ThemedText style={styles.formLabel}>Date</ThemedText>
-              <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.input, { color: textColor }]} />
-            </View>
-          )}
-
-          {showManualDialog && (
-            <Modal visible={showManualDialog} animationType="slide" transparent={true} onRequestClose={() => setShowManualDialog(false)}>
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <ThemedText style={styles.modalTitle}>Add Important Date</ThemedText>
-
-                  <ThemedText style={styles.label}>Title</ThemedText>
-                  <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Anniversary" style={[styles.modalInput, { color: textColor }]} />
-
-                  <ThemedText style={styles.label}>Date</ThemedText>
-                  <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.modalInput, { color: textColor }]} />
-
-                  <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={handleSave} accessibilityLabel="Save The Date">
-                    <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : 'Save The Date'}</ThemedText>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.cancelButton} onPress={() => setShowManualDialog(false)} accessibilityLabel="Cancel">
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                <ThemedText style={styles.label}>Date</ThemedText>
+                <View style={styles.row}>
+                  <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.modalInput, { color: textColor, flex: 1 }]} />
+                  <TouchableOpacity
+                    style={[styles.micButton, isRecording && recordingField === 'date' ? styles.micRecording : null]}
+                    onPress={() => (isRecording && recordingField === 'date' ? stopVoice() : startVoiceForField('date'))}
+                  >
+                    <Ionicons name="mic" size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
-              </View>
-            </Modal>
-          )}
 
-          <View style={{ height: 24 }} />
-        </ScrollView>
+                <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={handleSave} accessibilityLabel="Save The Date">
+                  <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : 'Save The Date'}</ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setShowVoiceDialog(false)} accessibilityLabel="Cancel">
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {showManualDialog && (
+          <Modal visible={showManualDialog} animationType="slide" transparent={true} onRequestClose={() => setShowManualDialog(false)}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <ThemedText style={styles.modalTitle}>Add Important Date</ThemedText>
+
+                <ThemedText style={styles.label}>Title</ThemedText>
+                <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Anniversary" style={[styles.modalInput, { color: textColor }]} />
+
+                <ThemedText style={styles.label}>Date</ThemedText>
+                <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.modalInput, { color: textColor }]} />
+
+                <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={handleSave} accessibilityLabel="Save The Date">
+                  <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : 'Save The Date'}</ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setShowManualDialog(false)} accessibilityLabel="Cancel">
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        <View style={{ height: 24 }} />
 
 
       </ThemedView>
@@ -293,7 +336,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   sectionTitle: { marginBottom: 10 },
   list: { marginBottom: 8 },
-  itemCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10 },
+  listCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10 },
+  itemCard: { backgroundColor: '#fafafa', borderRadius: 8, padding: 12, marginBottom: 10 },
   itemTitle: { fontSize: 16, fontWeight: '600' },
   itemMeta: { fontSize: 14, color: '#6b7280', marginTop: 4 },
   placeholderBox: { backgroundColor: '#fff', borderRadius: 12, padding: 18, alignItems: 'center' },
@@ -326,9 +370,6 @@ const styles = StyleSheet.create({
     elevation: 4,
     shadowColor: '#000',
     shadowOpacity: 0.1,
-    shadowRadius: 10,
-  },
-  modalTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 12,
