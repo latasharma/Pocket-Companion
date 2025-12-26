@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
+import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 
 export default function MedicationsScreen() {
   const router = useRouter();
@@ -23,8 +24,38 @@ export default function MedicationsScreen() {
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
 
   useEffect(() => {
+    requestNotificationPermission();
     fetchMedications();
   }, []);
+
+  useEffect(() => {
+    medications.forEach((med) => {
+      //console.log('Medications updated, scheduling notifications...', med);
+      if (!med.time) return;
+
+      console.log('Medications updated, scheduling notifications for', med.name, 'at', med.time);
+
+      const [hour, minute] = med.time.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hour, minute, 0);
+
+      // If time already passed today → schedule tomorrow
+      if (date < new Date()) {
+        date.setDate(date.getDate() + 1);
+      }
+
+      console.log('Scheduling notification for', med.name, 'at', date);
+
+      scheduleNotification({
+        id: `medication-${med.id}`,
+        title: 'Medication Reminder',
+        body: `Time to take ${med.name}`,
+        date,
+        repeat: true,
+        type: 'medication',
+      });
+    });
+  }, [medications]);
 
   const fetchMedications = async () => {
     try {

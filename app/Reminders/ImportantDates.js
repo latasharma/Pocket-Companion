@@ -8,6 +8,8 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
 import { VoiceInputService } from '@/lib/voiceInputService';
+import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
+import { buildLocalMorningDate, isSameLocalDay } from '../../lib/dateUtils';
 
 export default function ImportantDatesScreen() {
   const router = useRouter();
@@ -32,8 +34,70 @@ export default function ImportantDatesScreen() {
   const [recordingField, setRecordingField] = useState(null); // 'title' | 'date' | null
 
   useEffect(() => {
+    requestNotificationPermission();
     fetchImportantDates();
   }, []);
+
+  useEffect(() => {
+    const today = new Date();
+
+    importantDates.forEach((item) => {
+      if (!item.date) return;
+      console.log('Appointments updated, scheduling notifications for', item.date);
+
+      // const date = new Date(item.date);
+      // date.setHours(9, 0, 0);
+      // 🔔 Test notification after 5 minutes (timezone-safe)
+      // const testDate = new Date(Date.now() + 5 * 60 * 1000);
+      //testDate.setMinutes(testDate.getMinutes() + 5);
+
+      // console.log(
+      //   '[TEST NOTIFICATION]',
+      //   item.title,
+      //   testDate.toString()
+      // );
+
+      const eventDate = buildLocalMorningDate(item.date, 8, 0);
+      // const eventDate = new Date(Date.now() + 2 * 60 * 1000);
+      console.log(
+        'Scheduling important date notification:',
+        item.title,
+        'at',
+        eventDate.toString()
+      );
+
+      // const triggerDate = new Date();
+      // triggerDate.setMinutes(triggerDate.getMinutes() + 2);
+      // console.log(
+      //   'Scheduling important date notification:',
+      //   item.title,
+      //   'at',
+      //   triggerDate.toString()
+      // );
+
+      // ✅ Only TODAY
+    if (!isSameLocalDay(eventDate, today)) {
+      return;
+    }
+
+      // Safety: skip past dates
+      if (eventDate < new Date()) {
+        console.log(
+          'Skipping past important date:',
+          item.title
+        );
+        return;
+      }
+
+      scheduleNotification({
+        id: `important-date-${item.id}`,
+        title: 'Important Date',
+        body: item.title,
+        date: eventDate,
+        type: 'important_date',
+      });
+    });
+  }, [importantDates]);
 
   async function fetchImportantDates() {
     setLoading(true);

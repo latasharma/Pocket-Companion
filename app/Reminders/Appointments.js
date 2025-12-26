@@ -15,6 +15,7 @@ import {
   View
 } from 'react-native';
 import RNCalendarEvents from 'react-native-calendar-events';
+import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 import { supabase } from '../../lib/supabase';
 
 // Simple Appointments screen implementing the requirements from docs/reminder-redesign.md (section 5)
@@ -34,8 +35,26 @@ export default function Appointments() {
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
 
   useEffect(() => {
+    requestNotificationPermission();
     fetchAppointments();
   }, []);
+
+  useEffect(() => {
+    appointments.forEach((item) => {
+      if (!item.datetime) return;
+      console.log('Appointments updated, scheduling notifications for', item.datetime);
+
+      const date = new Date(item.datetime);
+
+      scheduleNotification({
+        id: `appointment-${item.id}`,
+        title: 'Upcoming Appointment',
+        body: item.title,
+        date,
+        type: 'appointment',
+      });
+    });
+  }, [appointments]);
 
   async function fetchAppointments() {
     setLoading(true);
