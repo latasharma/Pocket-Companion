@@ -151,7 +151,7 @@ export default function ImportantDatesScreen() {
       // handle common YYYY-MM-DD or YYYY/MM/DD formats without relying on Date parsing
       const isoMatch = /^(\d{4})[-/](\d{2})[-/](\d{2})/.exec(d);
       if (isoMatch) {
-        return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+        return `${isoMatch[2]}/${isoMatch[3]}/${isoMatch[1]}`;
       }
 
       // fallback to Date parsing for other formats
@@ -160,7 +160,7 @@ export default function ImportantDatesScreen() {
         const dd = String(parsed.getDate()).padStart(2, '0');
         const mm = String(parsed.getMonth() + 1).padStart(2, '0');
         const yyyy = parsed.getFullYear();
-        return `${dd}/${mm}/${yyyy}`;
+        return `${mm}/${dd}/${yyyy}`;
       }
 
       // if all else fails, return the original string
@@ -244,7 +244,7 @@ export default function ImportantDatesScreen() {
             <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Anniversary" style={[styles.input, { color: textColor }]} />
 
             <ThemedText style={styles.formLabel}>Date</ThemedText>
-            <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.input, { color: textColor }]} />
+            <TextInput value={date} onChangeText={setDate} placeholder="MM/DD/YYYY" style={[styles.input, { color: textColor }]} />
           </View>
         )}
 
@@ -267,7 +267,7 @@ export default function ImportantDatesScreen() {
 
                 <ThemedText style={styles.label}>Date</ThemedText>
                 <View style={styles.row}>
-                  <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.modalInput, { color: textColor, flex: 1 }]} />
+                  <TextInput value={date} onChangeText={setDate} placeholder="MM/DD/YYYY" style={[styles.modalInput, { color: textColor, flex: 1 }]} />
                   <TouchableOpacity
                     style={[styles.micButton, isRecording && recordingField === 'date' ? styles.micRecording : null]}
                     onPress={() => (isRecording && recordingField === 'date' ? stopVoice() : startVoiceForField('date'))}
@@ -298,7 +298,7 @@ export default function ImportantDatesScreen() {
                 <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Anniversary" style={[styles.modalInput, { color: textColor }]} />
 
                 <ThemedText style={styles.label}>Date</ThemedText>
-                <TextInput value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" style={[styles.modalInput, { color: textColor }]} />
+                <TextInput value={date} onChangeText={setDate} placeholder="MM/DD/YYYY" style={[styles.modalInput, { color: textColor }]} />
 
                 <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={handleSave} accessibilityLabel="Save The Date">
                   <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : 'Save The Date'}</ThemedText>
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12, fontSize: 16, flex: 1, backgroundColor: '#fff' },
   modalInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12, fontSize: 16, backgroundColor: '#fff', marginBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center' },
-  micButton: { marginLeft: 8, backgroundColor: '#ef4444', padding: 10, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  micButton: { marginBottom: 10, marginLeft: 8, backgroundColor: '#ef4444', padding: 10, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   micRecording: { backgroundColor: '#f59e0b' },
   bottomActions: { position: 'absolute', left: 0, right: 0, bottom: 80, flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16 },
   bigButton: { flex: 1, marginHorizontal: 8, borderWidth: 1, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },

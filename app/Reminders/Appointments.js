@@ -108,7 +108,7 @@ export default function Appointments() {
     const d = new Date(datetime);
     if (isNaN(d.getTime())) return datetime; // fallback to original string if parsing fails
     const pad = (n) => (n < 10 ? '0' + n : String(n));
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
   }
 
   function renderAppointmentItem({ item }) {
@@ -184,7 +184,7 @@ export default function Appointments() {
                 <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g., Doctor Visit" />
 
                 <Text style={styles.label}>Date & Time</Text>
-                <TextInput style={styles.input} value={datetime} onChangeText={setDatetime} placeholder="YYYY-MM-DDTHH:MM:SSZ" />
+                <TextInput style={styles.input} value={datetime} onChangeText={setDatetime} placeholder="MM/DD/YYYY" />
 
                 <Text style={styles.label}>Location</Text>
                 <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="e.g., Clinic" />
