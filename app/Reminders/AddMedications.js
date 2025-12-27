@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -10,16 +10,36 @@ import { supabase } from '@/lib/supabase';
 
 export default function AddMedicationsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const isEditing = !!params.id;
+
   const background = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
 
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
 
-  const [name, setName] = useState('');
-  const [dosage, setDosage] = useState('');
-  const [notes, setNotes] = useState('');
-  const [verification, setVerification] = useState({ nameChecked: false, dosageChecked: false, instructionsChecked: false });
+  const [name, setName] = useState(params.name || '');
+  const [dosage, setDosage] = useState(params.dosage || '');
+  const [time, setTime] = useState(params.time || '');
+  const [notes, setNotes] = useState(params.notes || '');
+  const [verification, setVerification] = useState(() => {
+    if (params.verification) {
+      try {
+        return typeof params.verification === 'string' ? JSON.parse(params.verification) : params.verification;
+      } catch (e) {
+        return { nameChecked: false, dosageChecked: false, instructionsChecked: false };
+      }
+    }
+    return { nameChecked: false, dosageChecked: false, instructionsChecked: false };
+  });
   const [saving, setSaving] = useState(false);
+
+  const timeOptions = [
+    { label: 'Breakfast', value: '08:00', display: '08:00 AM', icon: 'sunny-outline' },
+    { label: 'Lunch', value: '12:30', display: '12:30 PM', icon: 'restaurant-outline' },
+    { label: 'Dinner', value: '18:00', display: '06:00 PM', icon: 'moon-outline' },
+    { label: 'Bedtime', value: '21:00', display: '09:00 PM', icon: 'bed-outline' },
+  ];
 
   const handleBack = () => router.back();
 
@@ -36,17 +56,27 @@ export default function AddMedicationsScreen() {
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
 
+    console.log('Saving medication with details:', { name, dosage, time, notes, verification });
     try {
       const payload = {
         user_id: user.id,
         name: name.trim(),
         dosage: dosage.trim() || null,
+        time: time || null,
         notes: notes.trim() || null,
         verification: JSON.stringify(verification),
-        created_at: new Date().toISOString(),
       };
 
-      const { data, error } = await supabase.from('medications').insert([payload]);
+      let error;
+      if (isEditing) {
+        const { error: updateError } = await supabase.from('medications').update(payload).eq('id', params.id);
+        error = updateError;
+      } else {
+        payload.created_at = new Date().toISOString();
+        const { error: insertError } = await supabase.from('medications').insert([payload]);
+        error = insertError;
+      }
+
       if (error) {
         console.error('Supabase insert error:', error);
         Alert.alert('Error', 'Failed to save medication.');
@@ -70,7 +100,7 @@ export default function AddMedicationsScreen() {
           <TouchableOpacity onPress={handleBack} style={styles.backButton} accessibilityLabel="Back">
             <Ionicons name='arrow-back' size={24} color="#10b981" />
           </TouchableOpacity>
-          <ThemedText type="title" style={[styles.title, { fontFamily: uiFontFamily }]}>Add Reminder</ThemedText>
+          <ThemedText type="title" style={[styles.title, { fontFamily: uiFontFamily }]}>{isEditing ? 'Edit Medication' : 'Add Reminder'}</ThemedText>
           <View style={styles.appBarRight} />
         </View>
 
@@ -102,6 +132,43 @@ export default function AddMedicationsScreen() {
               style={[styles.input, { fontFamily: uiFontFamily, color: textColor, borderColor: '#e5e7eb' }]}
               accessibilityLabel="Dosage"
             />
+          </View>
+
+          <View style={styles.field}>
+            <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily }]}>Time</ThemedText>
+            <View style={styles.timeOptionsContainer}>
+              {timeOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.timeOption,
+                    time === option.value && styles.timeOptionSelected,
+                    { borderColor: time === option.value ? '#10b981' : '#e5e7eb' }
+                  ]}
+                  onPress={() => setTime(option.value)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${option.label} at ${option.display}`}
+                >
+                  <Ionicons 
+                    name={option.icon} 
+                    size={24} 
+                    color={time === option.value ? '#10b981' : '#6b7280'} 
+                  />
+                  <ThemedText style={[
+                    styles.timeOptionLabel, 
+                    { fontFamily: uiFontFamily, color: time === option.value ? '#10b981' : '#6b7280' }
+                  ]}>
+                    {option.label}
+                  </ThemedText>
+                  <ThemedText style={[
+                    styles.timeOptionValue, 
+                    { fontFamily: uiFontFamily, color: time === option.value ? '#10b981' : '#9ca3af' }
+                  ]}>
+                    {option.display}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           <View style={styles.field}>
@@ -155,7 +222,7 @@ export default function AddMedicationsScreen() {
             accessibilityLabel="Save Medicine"
             disabled={saving}
           >
-            <ThemedText type="defaultSemiBold" style={[styles.saveText, { fontFamily: uiFontFamily, color: '#fff' }]}>{saving ? 'Saving…' : 'Save Medicine'}</ThemedText>
+            <ThemedText type="defaultSemiBold" style={[styles.saveText, { fontFamily: uiFontFamily, color: '#fff' }]}>{saving ? 'Saving…' : (isEditing ? 'Update Medicine' : 'Save Medicine')}</ThemedText>
           </TouchableOpacity>
         </View>
       </ThemedView>
@@ -188,6 +255,32 @@ const styles = StyleSheet.create({
   checkItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
   checkbox: { width: 30, height: 30, borderRadius: 6, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   checkLabel: { fontSize: 16 },
+  timeOptionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  timeOption: {
+    width: '48%',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginBottom: 10,
+  },
+  timeOptionSelected: {
+    backgroundColor: '#ecfdf5',
+  },
+  timeOptionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  timeOptionValue: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   footer: { padding: 20, borderTopWidth: 0 },
   saveButton: { padding: 16, borderRadius: 12, alignItems: 'center' },
   saveText: { fontSize: 18 },

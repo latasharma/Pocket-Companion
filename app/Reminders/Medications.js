@@ -105,10 +105,53 @@ export default function MedicationsScreen() {
     router.back();
   };
 
+  const handleDelete = (id) => {
+    Alert.alert(
+      'Delete Medication',
+      'Are you sure you want to delete this medication?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.from('medications').delete().eq('id', id);
+            if (!error) fetchMedications();
+            else Alert.alert('Error', 'Failed to delete medication');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEdit = (item) => {
+    router.push({
+      pathname: '/Reminders/AddMedications',
+      params: {
+        id: item.id,
+        name: item.name,
+        dosage: item.dosage,
+        time: item.time ? item.time.substring(0, 5) : '',
+        notes: item.notes,
+        verification: typeof item.verification === 'object' ? JSON.stringify(item.verification) : item.verification,
+      },
+    });
+  };
+
   const renderMedItem = ({ item }) => (
     <View style={styles.medItem}>
-      <ThemedText style={[styles.medName, { fontFamily: uiFontFamily }]}>{item.name}</ThemedText>
-      <ThemedText style={[styles.medDetail, { fontFamily: uiFontFamily }]}>{item.dosage || ''}</ThemedText>
+      <View style={styles.medInfo}>
+        <ThemedText style={[styles.medName, { fontFamily: uiFontFamily }]}>{item.name}</ThemedText>
+        <ThemedText style={[styles.medDetail, { fontFamily: uiFontFamily }]}>{item.dosage || ''}</ThemedText>
+      </View>
+      <View style={styles.medActions}>
+        <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton} accessibilityLabel="Edit">
+          <Ionicons name="pencil" size={20} color="#3b82f6" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.iconButton} accessibilityLabel="Delete">
+          <Ionicons name="trash" size={20} color="#ef4444" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -232,7 +275,18 @@ const styles = StyleSheet.create({
   placeholderTitle: { fontSize: 18, fontWeight: '600', color: '#6b7280', marginBottom: 6 },
   placeholderSubtitle: { fontSize: 14, color: '#9ca3af' },
   placeholderText: { color: '#6b7280' },
-  medItem: { backgroundColor: '#fafafa', borderRadius: 12, padding: 12, marginBottom: 10 },
+  medItem: { 
+    backgroundColor: '#fafafa', 
+    borderRadius: 12, 
+    padding: 12, 
+    marginBottom: 10, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center' 
+  },
+  medInfo: { flex: 1 },
+  medActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconButton: { padding: 4 },
   medName: { fontWeight: '600', color: '#1f2937' },
   medDetail: { color: '#6b7280' },
   photoPreview: { marginBottom: 12, alignSelf: 'stretch' },

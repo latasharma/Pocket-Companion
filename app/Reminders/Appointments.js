@@ -1,13 +1,14 @@
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
-  FlatList,
   Modal,
   Platform,
   SafeAreaView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +16,6 @@ import {
   View
 } from 'react-native';
 import RNCalendarEvents from 'react-native-calendar-events';
-import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 import { supabase } from '../../lib/supabase';
 
 // Simple Appointments screen implementing the requirements from docs/reminder-redesign.md (section 5)
@@ -25,36 +25,69 @@ export default function Appointments() {
 
   // Manual entry fields
   const [title, setTitle] = useState('');
-  const [datetime, setDatetime] = useState('');
+  const [dateText, setDateText] = useState('');
+  const [timeText, setTimeText] = useState('');
   const [location, setLocation] = useState('');
   // Modal visibility for manual entry
   const [showManualDialog, setShowManualDialog] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [collapsedSections, setCollapsedSections] = useState({});
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
 
   const handleBack = () => router.back();
 
+  const minDate = new Date();
+  minDate.setDate(1);
+  minDate.setHours(0, 0, 0, 0);
+
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
 
+  const rawSections = appointments.reduce((acc, item) => {
+    const type = item.event_type || 'General';
+    const existingSection = acc.find((section) => section.title === type);
+    if (existingSection) {
+      existingSection.data.push(item);
+    } else {
+      acc.push({ title: type, data: [item] });
+    }
+    return acc;
+  }, []).sort((a, b) => a.title.localeCompare(b.title));
+
+  const sections = rawSections.map(section => ({
+    ...section,
+    data: collapsedSections[section.title] ? [] : section.data
+  }));
+
+  const toggleSection = (title) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }));
+  };
+
   useEffect(() => {
-    requestNotificationPermission();
+    //requestNotificationPermission();
     fetchAppointments();
   }, []);
 
-  useEffect(() => {
-    appointments.forEach((item) => {
-      if (!item.datetime) return;
-      console.log('Appointments updated, scheduling notifications for', item.datetime);
+  // useEffect(() => {
+  //   appointments.forEach((item) => {
+  //     if (!item.datetime) return;
+  //     console.log('Appointments updated, scheduling notifications for', item.datetime);
 
-      const date = new Date(item.datetime);
+  //     const date = new Date(item.datetime);
 
-      scheduleNotification({
-        id: `appointment-${item.id}`,
-        title: 'Upcoming Appointment',
-        body: item.title,
-        date,
-        type: 'appointment',
-      });
-    });
-  }, [appointments]);
+  //     scheduleNotification({
+  //       id: `appointment-${item.id}`,
+  //       title: 'Upcoming Appointment',
+  //       body: item.title,
+  //       date,
+  //       type: 'appointment',
+  //     });
+  //   });
+  // }, [appointments]);
 
   async function fetchAppointments() {
     setLoading(true);
@@ -73,11 +106,82 @@ export default function Appointments() {
     }
   }
 
+  const handleDelete = (id) => {
+    Alert.alert(
+      'Delete Appointment',
+      'Are you sure you want to delete this appointment?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.from('appointments').delete().eq('id', id);
+            if (!error) fetchAppointments();
+            else Alert.alert('Error', 'Failed to delete appointment');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEdit = (item) => {
+    setTitle(item.title);
+    setPickerDate(new Date());
+    if (item.datetime) {
+      const d = new Date(item.datetime);
+      if (!isNaN(d.getTime())) {
+        setPickerDate(d);
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        setDateText(`${mm}/${dd}/${yyyy}`);
+
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        setTimeText(`${hours}:${minutes} ${ampm}`);
+      } else {
+        setDateText(item.datetime);
+        setTimeText('');
+      }
+    }
+    setLocation(item.location || '');
+    setEditingId(item.id);
+    setShowManualDialog(true);
+  };
+
+  const resetForm = () => {
+    setTitle('');
+    setDateText('');
+    setTimeText('');
+    setLocation('');
+    setEditingId(null);
+    setShowManualDialog(false);
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+    setPickerDate(new Date());
+  };
+
   async function saveAppointment() {
-    if (!title || !datetime) {
-      Alert.alert('Missing fields', 'Please enter at least a title and date/time.');
+    if (!title || !dateText) {
+      Alert.alert('Missing fields', 'Please enter at least a title and date.');
       return;
     }
+
+    let finalDatetime = dateText;
+    if (timeText) {
+      finalDatetime = `${dateText} ${timeText}`;
+    }
+    const d = new Date(finalDatetime);
+    if (isNaN(d.getTime())) {
+      Alert.alert('Invalid Date', 'Please check the date and time format.');
+      return;
+    }
+    const datetime = d.toISOString();
+
     const { data: { user } } = await supabase.auth.getUser();
     
     try {
@@ -86,19 +190,25 @@ export default function Appointments() {
         title,
         datetime,
         location,
-        created_at: new Date().toISOString(),
       };
-      const { data, error } = await supabase.from('appointments').insert([payload]).select();
+
+      let error;
+      if (editingId) {
+        const { error: updateError } = await supabase.from('appointments').update(payload).eq('id', editingId);
+        error = updateError;
+      } else {
+        payload.created_at = new Date().toISOString();
+        const { error: insertError } = await supabase.from('appointments').insert([payload]);
+        error = insertError;
+      }
+
       if (error) {
-        console.warn('Supabase insert error', error);
+        console.warn('Supabase save error', error);
         Alert.alert('Error', 'Unable to save appointment.');
         return;
       }
       // refresh list and clear form
-      setTitle('');
-      setDatetime('');
-      setLocation('');
-      setShowManualDialog(false);
+      resetForm();
       fetchAppointments();
     } catch (err) {
       console.warn(err);
@@ -254,10 +364,40 @@ export default function Appointments() {
       case 'All Day':
         return { icon: 'sunny-outline', color: '#f59e0b' };
 
+      case 'Event':
+        return { icon: 'calendar-outline', color: '#8b5cf6' };
+
       default:
-        return { icon: 'calendar-outline', color: '#6b7280' };
+        return { icon: 'list-outline', color: '#6b7280' };
     }
   }
+
+  const onDateChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (selectedDate) {
+      setPickerDate(selectedDate);
+      const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(selectedDate.getDate()).padStart(2, '0');
+      const yyyy = selectedDate.getFullYear();
+      setDateText(`${mm}/${dd}/${yyyy}`);
+    }
+  };
+
+  const onTimeChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (selectedDate) {
+      let hours = selectedDate.getHours();
+      const minutes = String(selectedDate.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      setTimeText(`${hours}:${minutes} ${ampm}`);
+    }
+  };
 
   function renderAppointmentItem({ item }) {
     const formattedDate = formatDateString(item.datetime);
@@ -265,34 +405,35 @@ export default function Appointments() {
 
     return (
       <View style={styles.appointmentCard}>
-        <View style={styles.row}>
-          {/* Icon + Title tightly grouped */}
-          <View style={styles.titleWithIcon}>
-            <Ionicons
-              name={icon}
-              size={18}
-              color={color}
-              style={styles.eventIcon}
-            />
-            <Text style={styles.appointmentTitle}>
-              {item.title}
-            </Text>
-          </View>
-
-          {/* Event type badge */}
-          {item.event_type && (
-            <View style={[styles.badge, { backgroundColor: `${color}20` }]}>
-              <Text style={[styles.badgeText, { color }]}>
-                {item.event_type}
+        <View style={styles.cardContent}>
+          <View style={styles.row}>
+            {/* Icon + Title tightly grouped */}
+            <View style={styles.titleWithIcon}>
+              <Ionicons
+                name={icon}
+                size={18}
+                color={color}
+                style={styles.eventIcon}
+              />
+              <Text style={styles.appointmentTitle}>
+                {item.title}
               </Text>
             </View>
-          )}
-        </View>
+          </View>
 
-        <Text style={styles.appointmentMeta}>{formattedDate}</Text>
-        {item.location ? (
-          <Text style={styles.appointmentMeta}>{item.location}</Text>
-        ) : null}
+          <Text style={styles.appointmentMeta}>{formattedDate}</Text>
+          {item.location ? (
+            <Text style={styles.appointmentMeta}>{item.location}</Text>
+          ) : null}
+        </View>
+        <View style={styles.cardActions}>
+          <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton} accessibilityLabel="Edit">
+            <Ionicons name="pencil" size={20} color="#3b82f6" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.iconButton} accessibilityLabel="Delete">
+            <Ionicons name="trash" size={20} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -321,6 +462,12 @@ export default function Appointments() {
             <TouchableOpacity
               style={[styles.saveButton, { backgroundColor: '#10b981' }]}
               onPress={() => {
+                setEditingId(null);
+                setTitle('');
+                setDateText('');
+                setTimeText('');
+                setLocation('');
+                setPickerDate(new Date());
                 setShowManualDialog(true);
               }}
             >
@@ -336,12 +483,31 @@ export default function Appointments() {
           {loading ? (
             <Text style={styles.placeholder}>Loading...</Text>
           ) : appointments && appointments.length > 0 ? (
-            <FlatList
-              data={appointments}
+            <SectionList
+              sections={sections}
               keyExtractor={(i) => String(i.id)}
               renderItem={renderAppointmentItem}
+              renderSectionHeader={({ section: { title } }) => {
+                const { icon, color } = getEventUI(title);
+                return (
+                <TouchableOpacity 
+                  style={[styles.sectionHeaderContainer, { borderLeftColor: color }]} 
+                  onPress={() => toggleSection(title)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.sectionHeaderLeft}>
+                    <View style={[styles.sectionIconContainer, { backgroundColor: `${color}15` }]}>
+                      <Ionicons name={icon} size={24} color={color} />
+                    </View>
+                    <Text style={styles.sectionHeader}>{title}</Text>
+                  </View>
+                  <Ionicons name={collapsedSections[title] ? "chevron-down" : "chevron-up"} size={24} color="#9ca3af" />
+                </TouchableOpacity>
+              );
+              }}
               contentContainerStyle={styles.listContent}
               style={styles.list}
+              stickySectionHeadersEnabled={false}
             />
           ) : (
             <View style={styles.placeholderContainer}>
@@ -354,26 +520,136 @@ export default function Appointments() {
           <Modal visible={showManualDialog} animationType="slide" transparent={true} onRequestClose={() => setShowManualDialog(false)}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Add Appointment</Text>
+                <Text style={styles.modalTitle}>{editingId ? 'Edit Appointment' : 'Add Appointment'}</Text>
 
                 <Text style={styles.label}>Title</Text>
                 <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g., Doctor Visit" />
 
-                <Text style={styles.label}>Date & Time</Text>
-                <TextInput style={styles.input} value={datetime} onChangeText={setDatetime} placeholder="MM/DD/YYYY" />
+                <Text style={styles.label}>Date</Text>
+                <TouchableOpacity 
+                  style={styles.input} 
+                  onPress={() => {
+                    setShowTimePicker(false);
+                    setShowDatePicker(!showDatePicker);
+                  }}
+                >
+                  <Text style={{ color: dateText ? '#000' : '#9ca3af', fontSize: 16, paddingVertical: 4 }}>
+                    {dateText || 'MM/DD/YYYY'}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={styles.label}>Time</Text>
+                <TouchableOpacity 
+                  style={styles.input} 
+                  onPress={() => {
+                    setShowDatePicker(false);
+                    setShowTimePicker(!showTimePicker);
+                  }}
+                >
+                  <Text style={{ color: timeText ? '#000' : '#9ca3af', fontSize: 16, paddingVertical: 4 }}>
+                    {timeText || 'HH:MM AM/PM'}
+                  </Text>
+                </TouchableOpacity>
 
                 <Text style={styles.label}>Location</Text>
                 <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="e.g., Clinic" />
 
                 <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={saveAppointment} accessibilityLabel="Save Appointment">
-                  <ThemedText type="defaultSemiBold" style={[styles.saveButtonText, { color: '#fff' }]}>Save Appointment</ThemedText>
+                  <ThemedText type="defaultSemiBold" style={[styles.saveButtonText, { color: '#fff' }]}>{editingId ? 'Update Appointment' : 'Save Appointment'}</ThemedText>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.cancelButton]} onPress={() => setShowManualDialog(false)} accessibilityLabel="Cancel">
+                <TouchableOpacity style={[styles.cancelButton]} onPress={resetForm} accessibilityLabel="Cancel">
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Date/Time Pickers */}
+            {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
+              <Modal
+                transparent={true}
+                animationType="slide"
+                visible={showDatePicker || showTimePicker}
+                onRequestClose={() => {
+                  setShowDatePicker(false);
+                  setShowTimePicker(false);
+                }}
+              >
+                <View style={styles.pickerModalOverlay}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerHeader}>
+                      <TouchableOpacity onPress={() => {
+                        setShowDatePicker(false);
+                        setShowTimePicker(false);
+                      }}>
+                        <Text style={styles.pickerDoneText}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={pickerDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={onDateChange}
+                        style={{ backgroundColor: 'white' }}
+                        minimumDate={minDate}
+                      />
+                    )}
+                    {showTimePicker && (
+                      <DateTimePicker
+                        value={(() => {
+                          if (!timeText) return new Date();
+                          const d = new Date();
+                          try {
+                            const [time, modifier] = timeText.split(' ');
+                            let [hoursStr, minutes] = time.split(':');
+                            let hours = parseInt(hoursStr, 10);
+                            if (hours === 12) hours = 0;
+                            if (modifier === 'PM') hours += 12;
+                            d.setHours(hours, parseInt(minutes, 10));
+                          } catch (e) { return new Date(); }
+                          return d;
+                        })()}
+                        mode="time"
+                        display="spinner"
+                        onChange={onTimeChange}
+                        style={{ backgroundColor: 'white' }}
+                      />
+                    )}
+                  </View>
+                </View>
+              </Modal>
+            )}
+
+            {Platform.OS === 'android' && showDatePicker && (
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display="default"
+                onChange={onDateChange}
+                minimumDate={minDate}
+              />
+            )}
+            {Platform.OS === 'android' && showTimePicker && (
+              <DateTimePicker
+                value={(() => {
+                  if (!timeText) return new Date();
+                  const d = new Date();
+                  try {
+                    const [time, modifier] = timeText.split(' ');
+                    let [hoursStr, minutes] = time.split(':');
+                    let hours = parseInt(hoursStr, 10);
+                    if (hours === 12) hours = 0;
+                    if (modifier === 'PM') hours += 12;
+                    d.setHours(hours, parseInt(minutes, 10));
+                  } catch (e) { return new Date(); }
+                  return d;
+                })()}
+                mode="time"
+                display="default"
+                onChange={onTimeChange}
+              />
+            )}
           </Modal>
         </View>
 
@@ -430,6 +706,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
   },
+  sectionHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderLeftWidth: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  sectionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   list: {
     marginBottom: 12,
   },
@@ -442,6 +752,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   appointmentTitle: {
     fontSize: 16,
@@ -451,6 +764,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginLeft: 8,
+  },
+  iconButton: {
+    padding: 4,
   },
   placeholderContainer: {
     alignItems: 'center',
@@ -553,6 +878,28 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontWeight: '600',
     fontSize: 16,
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  pickerContainer: {
+    backgroundColor: '#fff',
+    paddingBottom: 20,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  pickerDoneText: {
+    color: '#10b981',
+    fontSize: 16,
+    fontWeight: '600',
   },
   row: {
     flexDirection: 'row',

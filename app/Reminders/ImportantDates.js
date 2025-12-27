@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
 import { VoiceInputService } from '@/lib/voiceInputService';
-import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
-import { buildLocalMorningDate, isSameLocalDay } from '../../lib/dateUtils';
 
 export default function ImportantDatesScreen() {
   const router = useRouter();
@@ -18,10 +17,15 @@ export default function ImportantDatesScreen() {
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
 
   const [importantDates, setImportantDates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
 
   // UI state
     const [showManualForm, setShowManualForm] = useState(false);
@@ -33,71 +37,74 @@ export default function ImportantDatesScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingField, setRecordingField] = useState(null); // 'title' | 'date' | null
 
+  const minDate = new Date();
+  minDate.setHours(0, 0, 0, 0);
+
   useEffect(() => {
-    requestNotificationPermission();
+    // requestNotificationPermission();
     fetchImportantDates();
   }, []);
 
-  useEffect(() => {
-    const today = new Date();
+  // useEffect(() => {
+  //   const today = new Date();
 
-    importantDates.forEach((item) => {
-      if (!item.date) return;
-      console.log('Appointments updated, scheduling notifications for', item.date);
+  //   importantDates.forEach((item) => {
+  //     if (!item.date) return;
+  //     console.log('Appointments updated, scheduling notifications for', item.date);
 
-      // const date = new Date(item.date);
-      // date.setHours(9, 0, 0);
-      // 🔔 Test notification after 5 minutes (timezone-safe)
-      // const testDate = new Date(Date.now() + 5 * 60 * 1000);
-      //testDate.setMinutes(testDate.getMinutes() + 5);
+  //     // const date = new Date(item.date);
+  //     // date.setHours(9, 0, 0);
+  //     // 🔔 Test notification after 5 minutes (timezone-safe)
+  //     // const testDate = new Date(Date.now() + 5 * 60 * 1000);
+  //     //testDate.setMinutes(testDate.getMinutes() + 5);
 
-      // console.log(
-      //   '[TEST NOTIFICATION]',
-      //   item.title,
-      //   testDate.toString()
-      // );
+  //     // console.log(
+  //     //   '[TEST NOTIFICATION]',
+  //     //   item.title,
+  //     //   testDate.toString()
+  //     // );
 
-      const eventDate = buildLocalMorningDate(item.date, 8, 0);
-      // const eventDate = new Date(Date.now() + 2 * 60 * 1000);
-      console.log(
-        'Scheduling important date notification:',
-        item.title,
-        'at',
-        eventDate.toString()
-      );
+  //     const eventDate = buildLocalMorningDate(item.date, 8, 0);
+  //     // const eventDate = new Date(Date.now() + 2 * 60 * 1000);
+  //     console.log(
+  //       'Scheduling important date notification:',
+  //       item.title,
+  //       'at',
+  //       eventDate.toString()
+  //     );
 
-      // const triggerDate = new Date();
-      // triggerDate.setMinutes(triggerDate.getMinutes() + 2);
-      // console.log(
-      //   'Scheduling important date notification:',
-      //   item.title,
-      //   'at',
-      //   triggerDate.toString()
-      // );
+  //     // const triggerDate = new Date();
+  //     // triggerDate.setMinutes(triggerDate.getMinutes() + 2);
+  //     // console.log(
+  //     //   'Scheduling important date notification:',
+  //     //   item.title,
+  //     //   'at',
+  //     //   triggerDate.toString()
+  //     // );
 
-      // ✅ Only TODAY
-    if (!isSameLocalDay(eventDate, today)) {
-      return;
-    }
+  //     // ✅ Only TODAY
+  //   if (!isSameLocalDay(eventDate, today)) {
+  //     return;
+  //   }
 
-      // Safety: skip past dates
-      if (eventDate < new Date()) {
-        console.log(
-          'Skipping past important date:',
-          item.title
-        );
-        return;
-      }
+  //     // Safety: skip past dates
+  //     if (eventDate < new Date()) {
+  //       console.log(
+  //         'Skipping past important date:',
+  //         item.title
+  //       );
+  //       return;
+  //     }
 
-      scheduleNotification({
-        id: `important-date-${item.id}`,
-        title: 'Important Date',
-        body: item.title,
-        date: eventDate,
-        type: 'important_date',
-      });
-    });
-  }, [importantDates]);
+  //     scheduleNotification({
+  //       id: `important-date-${item.id}`,
+  //       title: 'Important Date',
+  //       body: item.title,
+  //       date: eventDate,
+  //       type: 'important_date',
+  //     });
+  //   });
+  // }, [importantDates]);
 
   async function fetchImportantDates() {
     setLoading(true);
@@ -170,10 +177,67 @@ export default function ImportantDatesScreen() {
     }
   };
 
+  const handleDelete = (id) => {
+    Alert.alert(
+      'Delete Date',
+      'Are you sure you want to delete this important date?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.from('important_dates').delete().eq('id', id);
+            if (!error) fetchImportantDates();
+            else Alert.alert('Error', 'Failed to delete date');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEdit = (item) => {
+    setTitle(item.title);
+    setPickerDate(new Date());
+    if (item.date) {
+      const d = new Date(item.date);
+      if (!isNaN(d.getTime())) {
+        setPickerDate(d);
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        setDate(`${mm}/${dd}/${yyyy}`);
+
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        setTime(`${hours}:${minutes} ${ampm}`);
+      } else {
+        setDate(item.date);
+        setTime('');
+      }
+    }
+    setEditingId(item.id);
+    setShowManualDialog(true);
+    setShowVoiceForm(false);
+    setShowManualForm(false);
+  };
+
   const handleSave = async () => {
     if (!title.trim() || !date.trim()) {
       Alert.alert('Missing fields', 'Please enter both a title and a date.');
       return;
+    }
+
+    let finalDate = date.trim();
+    if (time.trim()) {
+      finalDate = `${date.trim()} ${time.trim()}`;
+    }
+    const d = new Date(finalDate);
+    if (!isNaN(d.getTime())) {
+      finalDate = d.toISOString();
     }
 
     setSaving(true);
@@ -183,11 +247,19 @@ export default function ImportantDatesScreen() {
       const payload = {
         user_id: user.id,
         title: title.trim(),
-        date: date.trim(),
-        created_at: new Date().toISOString(),
+        date: finalDate,
       };
 
-      const { data, error } = await supabase.from('important_dates').insert([payload]).select();
+      let error;
+      if (editingId) {
+        const { error: updateError } = await supabase.from('important_dates').update(payload).eq('id', editingId);
+        error = updateError;
+      } else {
+        payload.created_at = new Date().toISOString();
+        const { error: insertError } = await supabase.from('important_dates').insert([payload]);
+        error = insertError;
+      }
+
       if (error) {
         console.error('Supabase insert error', error);
         Alert.alert('Error', 'Unable to save the date.');
@@ -196,6 +268,8 @@ export default function ImportantDatesScreen() {
 
       setTitle('');
       setDate('');
+      setTime('');
+      setEditingId(null);
       setShowManualForm(false);
       setShowVoiceForm(false);
       setShowManualDialog(false);
@@ -206,6 +280,33 @@ export default function ImportantDatesScreen() {
       Alert.alert('Error', 'An unexpected error occurred.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onDateChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (selectedDate) {
+      setPickerDate(selectedDate);
+      const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(selectedDate.getDate()).padStart(2, '0');
+      const yyyy = selectedDate.getFullYear();
+      setDate(`${mm}/${dd}/${yyyy}`);
+    }
+  };
+
+  const onTimeChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (selectedDate) {
+      let hours = selectedDate.getHours();
+      const minutes = String(selectedDate.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      setTime(`${hours}:${minutes} ${ampm}`);
     }
   };
 
@@ -233,8 +334,18 @@ export default function ImportantDatesScreen() {
 
     return (
       <View style={styles.itemCard}>
-        <ThemedText style={styles.itemTitle}>{item.title}</ThemedText>
-        <ThemedText style={styles.itemMeta}>{formatDate(item.date)}</ThemedText>
+        <View style={styles.itemContent}>
+          <ThemedText style={styles.itemTitle}>{item.title}</ThemedText>
+          <ThemedText style={styles.itemMeta}>{formatDate(item.date)}</ThemedText>
+        </View>
+        <View style={styles.itemActions}>
+          <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton} accessibilityLabel="Edit">
+            <Ionicons name="pencil" size={20} color="#3b82f6" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.iconButton} accessibilityLabel="Delete">
+            <Ionicons name="trash" size={20} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -273,6 +384,11 @@ export default function ImportantDatesScreen() {
 
                   <TouchableOpacity style={[styles.topActionButton, { backgroundColor: '#10b981', marginTop: 8 }]} onPress={() => {
                     setShowManualDialog(true);
+                    setTitle('');
+                    setDate('');
+                    setTime('');
+                    setEditingId(null);
+                    setPickerDate(new Date());
                     setShowVoiceForm(false);
                     setShowManualForm(false);
                   }}>
@@ -356,16 +472,39 @@ export default function ImportantDatesScreen() {
           <Modal visible={showManualDialog} animationType="slide" transparent={true} onRequestClose={() => setShowManualDialog(false)}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <ThemedText style={styles.modalTitle}>Add Important Date</ThemedText>
+                <ThemedText style={styles.modalTitle}>{editingId ? 'Edit Important Date' : 'Add Important Date'}</ThemedText>
 
                 <ThemedText style={styles.label}>Title</ThemedText>
                 <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Anniversary" style={[styles.modalInput, { color: textColor }]} />
 
                 <ThemedText style={styles.label}>Date</ThemedText>
-                <TextInput value={date} onChangeText={setDate} placeholder="MM/DD/YYYY" style={[styles.modalInput, { color: textColor }]} />
+                <TouchableOpacity 
+                  style={styles.modalInput} 
+                  onPress={() => {
+                    setShowTimePicker(false);
+                    setShowDatePicker(!showDatePicker);
+                  }}
+                >
+                  <Text style={{ color: date ? textColor : '#9ca3af', fontSize: 16 }}>
+                    {date || 'MM/DD/YYYY'}
+                  </Text>
+                </TouchableOpacity>
+
+                <ThemedText style={styles.label}>Time</ThemedText>
+                <TouchableOpacity 
+                  style={styles.modalInput} 
+                  onPress={() => {
+                    setShowDatePicker(false);
+                    setShowTimePicker(!showTimePicker);
+                  }}
+                >
+                  <Text style={{ color: time ? textColor : '#9ca3af', fontSize: 16 }}>
+                    {time || 'HH:MM AM/PM'}
+                  </Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={handleSave} accessibilityLabel="Save The Date">
-                  <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : 'Save The Date'}</ThemedText>
+                  <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : (editingId ? 'Update Date' : 'Save The Date')}</ThemedText>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.cancelButton} onPress={() => setShowManualDialog(false)} accessibilityLabel="Cancel">
@@ -373,6 +512,93 @@ export default function ImportantDatesScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Date/Time Pickers */}
+            {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
+              <Modal
+                transparent={true}
+                animationType="slide"
+                visible={showDatePicker || showTimePicker}
+                onRequestClose={() => {
+                  setShowDatePicker(false);
+                  setShowTimePicker(false);
+                }}
+              >
+                <View style={styles.pickerModalOverlay}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerHeader}>
+                      <TouchableOpacity onPress={() => {
+                        setShowDatePicker(false);
+                        setShowTimePicker(false);
+                      }}>
+                        <Text style={styles.pickerDoneText}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={pickerDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={onDateChange}
+                        style={{ backgroundColor: 'white' }}
+                        minimumDate={minDate}
+                      />
+                    )}
+                    {showTimePicker && (
+                      <DateTimePicker
+                        value={(() => {
+                          if (!time) return new Date();
+                          const d = new Date();
+                          try {
+                            const [t, modifier] = time.split(' ');
+                            let [hoursStr, minutes] = t.split(':');
+                            let hours = parseInt(hoursStr, 10);
+                            if (hours === 12) hours = 0;
+                            if (modifier === 'PM') hours += 12;
+                            d.setHours(hours, parseInt(minutes, 10));
+                          } catch (e) { return new Date(); }
+                          return d;
+                        })()}
+                        mode="time"
+                        display="spinner"
+                        onChange={onTimeChange}
+                        style={{ backgroundColor: 'white' }}
+                      />
+                    )}
+                  </View>
+                </View>
+              </Modal>
+            )}
+
+            {Platform.OS === 'android' && showDatePicker && (
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display="default"
+                onChange={onDateChange}
+                minimumDate={minDate}
+              />
+            )}
+            {Platform.OS === 'android' && showTimePicker && (
+              <DateTimePicker
+                value={(() => {
+                  if (!time) return new Date();
+                  const d = new Date();
+                  try {
+                    const [t, modifier] = time.split(' ');
+                    let [hoursStr, minutes] = t.split(':');
+                    let hours = parseInt(hoursStr, 10);
+                    if (hours === 12) hours = 0;
+                    if (modifier === 'PM') hours += 12;
+                    d.setHours(hours, parseInt(minutes, 10));
+                  } catch (e) { return new Date(); }
+                  return d;
+                })()}
+                mode="time"
+                display="default"
+                onChange={onTimeChange}
+              />
+            )}
           </Modal>
         )}
 
@@ -401,7 +627,18 @@ const styles = StyleSheet.create({
   sectionTitle: { marginBottom: 10 },
   list: { marginBottom: 8 },
   listCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10 },
-  itemCard: { backgroundColor: '#fafafa', borderRadius: 8, padding: 12, marginBottom: 10 },
+  itemCard: { 
+    backgroundColor: '#fafafa', 
+    borderRadius: 8, 
+    padding: 12, 
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  itemContent: { flex: 1 },
+  itemActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconButton: { padding: 4 },
   itemTitle: { fontSize: 16, fontWeight: '600' },
   itemMeta: { fontSize: 14, color: '#6b7280', marginTop: 4 },
   placeholderBox: { backgroundColor: '#fff', borderRadius: 12, padding: 18, alignItems: 'center' },
@@ -460,4 +697,26 @@ const styles = StyleSheet.create({
   topActions: { flexDirection: 'column', alignItems: 'stretch', marginBottom: 16 },
   topActionButton: { paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center', width: '100%' },
   topActionButtonText: { fontSize: 16, fontWeight: '600' },
+  pickerModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  pickerContainer: {
+    backgroundColor: '#fff',
+    paddingBottom: 20,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  pickerDoneText: {
+    color: '#10b981',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
