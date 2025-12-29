@@ -55,11 +55,23 @@ export default function ImportantDatesScreen() {
       // Check if date is valid
       if (isNaN(eventDate.getTime())) return;
 
+      // If time field exists, use it to set the exact time
+      if (item.time) {
+        const timeParts = item.time.split(':');
+        if (timeParts.length >= 2) {
+          const hours = parseInt(timeParts[0], 10);
+          const minutes = parseInt(timeParts[1], 10);
+          
+          // Set the exact hours and minutes from the time field
+          eventDate.setHours(hours, minutes, 0, 0);
+        }
+      }
+      
       // Safety: skip past dates
       if (eventDate < new Date()) {
         return;
       }
-      
+
       console.log('Scheduling notification for', item.title, 'at', eventDate.toString());
 
       scheduleNotification({
@@ -107,6 +119,7 @@ export default function ImportantDatesScreen() {
         (text) => {
           if (field === 'title') setTitle((t) => (t ? t + ' ' + text : text));
           else if (field === 'date') setDate((d) => (d ? d + ' ' + text : text));
+          else if (field === 'time') setTime((t) => (t ? t + ' ' + text : text));
 
           setIsRecording(false);
           setRecordingField(null);
@@ -165,6 +178,7 @@ export default function ImportantDatesScreen() {
   const handleEdit = (item) => {
     setTitle(item.title);
     setPickerDate(new Date());
+    
     if (item.date) {
       const d = new Date(item.date);
       if (!isNaN(d.getTime())) {
@@ -173,7 +187,37 @@ export default function ImportantDatesScreen() {
         const dd = String(d.getDate()).padStart(2, '0');
         const yyyy = d.getFullYear();
         setDate(`${mm}/${dd}/${yyyy}`);
+      } else {
+        setDate(item.date);
+      }
+    }
 
+    // Handle time field from Supabase
+    if (item.time) {
+      // item.time is in HH:MM:SS format (e.g., "15:30:00")
+      const timeParts = item.time.split(':');
+      if (timeParts.length >= 2) {
+        let hours = parseInt(timeParts[0], 10);
+        const minutes = timeParts[1];
+        
+        // Convert 24-hour format to 12-hour format with AM/PM
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        
+        setTime(`${hours}:${minutes} ${ampm}`);
+        
+        // Also update pickerDate with the time for the time picker
+        const d = new Date(item.date);
+        if (!isNaN(d.getTime())) {
+          d.setHours(parseInt(timeParts[0], 10), parseInt(timeParts[1], 10), 0);
+          setPickerDate(d);
+        }
+      }
+    } else {
+      // Fallback if time field doesn't exist (for backward compatibility)
+      const d = new Date(item.date);
+      if (!isNaN(d.getTime())) {
         let hours = d.getHours();
         const minutes = String(d.getMinutes()).padStart(2, '0');
         const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -181,10 +225,10 @@ export default function ImportantDatesScreen() {
         hours = hours ? hours : 12;
         setTime(`${hours}:${minutes} ${ampm}`);
       } else {
-        setDate(item.date);
         setTime('');
       }
     }
+
     setEditingId(item.id);
     setShowManualDialog(true);
     setShowVoiceForm(false);
@@ -192,65 +236,109 @@ export default function ImportantDatesScreen() {
   };
 
   const handleSave = async () => {
-    if (!title.trim() || !date.trim()) {
-      Alert.alert('Missing fields', 'Please enter both a title and a date.');
+  if (!title.trim() || !date.trim()) {
+    Alert.alert('Missing fields', 'Please enter both a title and a date.');
+    return;
+  }
+
+  let d;
+  // Robust date parsing (MM/DD/YYYY)
+  const dateParts = date.trim().split('/');
+  if (dateParts.length === 3) {
+    // Note: new Date(y, m, d) creates a local date at 00:00:00
+    d = new Date(
+      parseInt(dateParts[2], 10),
+      parseInt(dateParts[0], 10) - 1,
+      parseInt(dateParts[1], 10)
+    );
+  } else {
+    d = new Date(date.trim());
+  }
+
+  if (isNaN(d.getTime())) {
+    Alert.alert('Invalid Date', 'Please check the date format.');
+    return;
+  }
+
+  // Default time: 9:00 AM
+  let hours = 9;
+  let minutes = 0;
+  let timeString = '09:00:00'; // HH:MM:SS format for database
+
+  if (time.trim()) {
+    const timeMatch = time.trim().match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (timeMatch) {
+      let h = parseInt(timeMatch[1], 10);
+      const m = parseInt(timeMatch[2], 10);
+      const ampm = timeMatch[3]?.toUpperCase();
+
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      
+      hours = h;
+      minutes = m;
+      
+      // Format time as HH:MM:SS for database storage
+      timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+    } else {
+      // Fallback for simple HH:MM
+      const simpleParts = time.trim().split(':');
+      if (simpleParts.length >= 2) {
+        hours = parseInt(simpleParts[0], 10);
+        minutes = parseInt(simpleParts[1], 10);
+        timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+      }
+    }
+  }
+
+  // Explicitly set the time, zeroing seconds and milliseconds
+  d.setHours(hours, minutes, 0, 0);
+
+  const finalDate = d.toISOString();
+
+  setSaving(true);
+  const { data: { user } } = await supabase.auth.getUser();
+
+  try {
+    const payload = {
+      user_id: user.id,
+      title: title.trim(),
+      date: finalDate,
+      time: timeString, // Store time separately (HH:MM:SS format)
+    };
+
+    let error;
+    if (editingId) {
+      const { error: updateError } = await supabase.from('important_dates').update(payload).eq('id', editingId);
+      error = updateError;
+    } else {
+      payload.created_at = new Date().toISOString();
+      const { error: insertError } = await supabase.from('important_dates').insert([payload]);
+      error = insertError;
+    }
+
+    if (error) {
+      console.error('Supabase insert error', error);
+      Alert.alert('Error', 'Unable to save the date.');
       return;
     }
 
-    let finalDate = date.trim();
-    if (time.trim()) {
-      finalDate = `${date.trim()} ${time.trim()}`;
-    } else {
-      // Default to 9:00 AM if no time is selected
-      finalDate = `${date.trim()} 09:00 AM`;
-    }
-    const d = new Date(finalDate);
-    if (!isNaN(d.getTime())) {
-      finalDate = d.toISOString();
-    }
-
-    setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
-    try {
-      const payload = {
-        user_id: user.id,
-        title: title.trim(),
-        date: finalDate,
-      };
-
-      let error;
-      if (editingId) {
-        const { error: updateError } = await supabase.from('important_dates').update(payload).eq('id', editingId);
-        error = updateError;
-      } else {
-        payload.created_at = new Date().toISOString();
-        const { error: insertError } = await supabase.from('important_dates').insert([payload]);
-        error = insertError;
-      }
-
-      if (error) {
-        console.error('Supabase insert error', error);
-        Alert.alert('Error', 'Unable to save the date.');
-        return;
-      }
-
-      setTitle('');
-      setDate('');
-      setTime('');
-      setEditingId(null);
-      setShowManualForm(false);
-      setShowVoiceForm(false);
-      setShowManualDialog(false);
-      setShowVoiceDialog(false);
-      fetchImportantDates();
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'An unexpected error occurred.');
-    } finally {
-      setSaving(false);
-    }
-  };
+    setTitle('');
+    setDate('');
+    setTime('');
+    setEditingId(null);
+    setShowManualForm(false);
+    setShowVoiceForm(false);
+    setShowManualDialog(false);
+    setShowVoiceDialog(false);
+    fetchImportantDates();
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Error', 'An unexpected error occurred.');
+  } finally {
+    setSaving(false);
+  }
+};
 
   const onDateChange = (event, selectedDate) => {
     if (Platform.OS === 'android') {
@@ -270,6 +358,7 @@ export default function ImportantDatesScreen() {
       setShowTimePicker(false);
     }
     if (selectedDate) {
+      setPickerDate(selectedDate);
       let hours = selectedDate.getHours();
       const minutes = String(selectedDate.getMinutes()).padStart(2, '0');
       const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -416,10 +505,57 @@ export default function ImportantDatesScreen() {
 
                 <ThemedText style={styles.label}>Date</ThemedText>
                 <View style={styles.row}>
-                  <TextInput value={date} onChangeText={setDate} placeholder="MM/DD/YYYY" style={[styles.modalInput, { color: textColor, flex: 1 }]} />
+                  <TouchableOpacity
+                    style={[styles.modalInput, { flex: 1 }]}
+                    onPress={() => {
+                      setShowTimePicker(false);
+                      setShowDatePicker(!showDatePicker);
+                    }}
+                  >
+                    <Text style={{ color: date ? textColor : '#9ca3af', fontSize: 16 }}>
+                      {date || 'MM/DD/YYYY'}
+                    </Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.micButton, isRecording && recordingField === 'date' ? styles.micRecording : null]}
                     onPress={() => (isRecording && recordingField === 'date' ? stopVoice() : startVoiceForField('date'))}
+                  >
+                    <Ionicons name="mic" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <ThemedText style={styles.label}>Time</ThemedText>
+                <View style={styles.row}>
+                  <TouchableOpacity
+                    style={[styles.modalInput, { flex: 1 }]}
+                    onPress={() => {
+                      if (time) {
+                        const d = new Date();
+                        try {
+                          const [t, modifier] = time.split(' ');
+                          let [hoursStr, minutes] = t.split(':');
+                          let hours = parseInt(hoursStr, 10);
+                          if (hours === 12) hours = 0;
+                          if (modifier === 'PM') hours += 12;
+                          d.setHours(hours, parseInt(minutes, 10));
+                          setPickerDate(d);
+                        } catch (e) {
+                          setPickerDate(new Date());
+                        }
+                      } else {
+                        setPickerDate(new Date());
+                      }
+                      setShowDatePicker(false);
+                      setShowTimePicker(!showTimePicker);
+                    }}
+                  >
+                    <Text style={{ color: time ? textColor : '#9ca3af', fontSize: 16 }}>
+                      {time || 'HH:MM AM/PM'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.micButton, isRecording && recordingField === 'time' ? styles.micRecording : null]}
+                    onPress={() => (isRecording && recordingField === 'time' ? stopVoice() : startVoiceForField('time'))}
                   >
                     <Ionicons name="mic" size={20} color="#fff" />
                   </TouchableOpacity>
@@ -434,6 +570,69 @@ export default function ImportantDatesScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Date/Time Pickers */}
+            {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
+              <Modal
+                transparent={true}
+                animationType="slide"
+                visible={showDatePicker || showTimePicker}
+                onRequestClose={() => {
+                  setShowDatePicker(false);
+                  setShowTimePicker(false);
+                }}
+              >
+                <View style={styles.pickerModalOverlay}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerHeader}>
+                      <TouchableOpacity onPress={() => {
+                        setShowDatePicker(false);
+                        setShowTimePicker(false);
+                      }}>
+                        <Text style={styles.pickerDoneText}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={pickerDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={onDateChange}
+                        style={{ backgroundColor: 'white' }}
+                        minimumDate={minDate}
+                      />
+                    )}
+                    {showTimePicker && (
+                      <DateTimePicker
+                        value={pickerDate}
+                        mode="time"
+                        display="spinner"
+                        onChange={onTimeChange}
+                        style={{ backgroundColor: 'white' }}
+                      />
+                    )}
+                  </View>
+                </View>
+              </Modal>
+            )}
+
+            {Platform.OS === 'android' && showDatePicker && (
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display="default"
+                onChange={onDateChange}
+                minimumDate={minDate}
+              />
+            )}
+            {Platform.OS === 'android' && showTimePicker && (
+              <DateTimePicker
+                value={pickerDate}
+                mode="time"
+                display="default"
+                onChange={onTimeChange}
+              />
+            )}
           </Modal>
         )}
 
@@ -463,6 +662,20 @@ export default function ImportantDatesScreen() {
                 <TouchableOpacity 
                   style={styles.modalInput} 
                   onPress={() => {
+                    if (time) {
+                      const d = new Date();
+                      try {
+                        const [t, modifier] = time.split(' ');
+                        let [hoursStr, minutes] = t.split(':');
+                        let hours = parseInt(hoursStr, 10);
+                        if (hours === 12) hours = 0;
+                        if (modifier === 'PM') hours += 12;
+                        d.setHours(hours, parseInt(minutes, 10));
+                        setPickerDate(d);
+                      } catch (e) {
+                        setPickerDate(new Date());
+                      }
+                    }
                     setShowDatePicker(false);
                     setShowTimePicker(!showTimePicker);
                   }}
@@ -515,19 +728,7 @@ export default function ImportantDatesScreen() {
                     )}
                     {showTimePicker && (
                       <DateTimePicker
-                        value={(() => {
-                          if (!time) return new Date();
-                          const d = new Date();
-                          try {
-                            const [t, modifier] = time.split(' ');
-                            let [hoursStr, minutes] = t.split(':');
-                            let hours = parseInt(hoursStr, 10);
-                            if (hours === 12) hours = 0;
-                            if (modifier === 'PM') hours += 12;
-                            d.setHours(hours, parseInt(minutes, 10));
-                          } catch (e) { return new Date(); }
-                          return d;
-                        })()}
+                        value={pickerDate}
                         mode="time"
                         display="spinner"
                         onChange={onTimeChange}
@@ -550,19 +751,7 @@ export default function ImportantDatesScreen() {
             )}
             {Platform.OS === 'android' && showTimePicker && (
               <DateTimePicker
-                value={(() => {
-                  if (!time) return new Date();
-                  const d = new Date();
-                  try {
-                    const [t, modifier] = time.split(' ');
-                    let [hoursStr, minutes] = t.split(':');
-                    let hours = parseInt(hoursStr, 10);
-                    if (hours === 12) hours = 0;
-                    if (modifier === 'PM') hours += 12;
-                    d.setHours(hours, parseInt(minutes, 10));
-                  } catch (e) { return new Date(); }
-                  return d;
-                })()}
+                value={pickerDate}
                 mode="time"
                 display="default"
                 onChange={onTimeChange}
