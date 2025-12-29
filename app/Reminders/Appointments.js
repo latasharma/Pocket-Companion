@@ -16,6 +16,7 @@ import {
   View
 } from 'react-native';
 import RNCalendarEvents from 'react-native-calendar-events';
+import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 import { supabase } from '../../lib/supabase';
 
 // Simple Appointments screen implementing the requirements from docs/reminder-redesign.md (section 5)
@@ -68,26 +69,26 @@ export default function Appointments() {
   };
 
   useEffect(() => {
-    //requestNotificationPermission();
+    requestNotificationPermission();
     fetchAppointments();
   }, []);
 
-  // useEffect(() => {
-  //   appointments.forEach((item) => {
-  //     if (!item.datetime) return;
-  //     console.log('Appointments updated, scheduling notifications for', item.datetime);
+  useEffect(() => {
+    appointments.forEach((item) => {
+      if (!item.datetime) return;
+      console.log('Appointments updated, scheduling notifications for', item.datetime);
 
-  //     const date = new Date(item.datetime);
+      const date = new Date(item.datetime);
 
-  //     scheduleNotification({
-  //       id: `appointment-${item.id}`,
-  //       title: 'Upcoming Appointment',
-  //       body: item.title,
-  //       date,
-  //       type: 'appointment',
-  //     });
-  //   });
-  // }, [appointments]);
+      scheduleNotification({
+        id: `appointment-${item.id}`,
+        title: 'Upcoming Appointment',
+        body: item.title,
+        date,
+        type: 'appointment',
+      });
+    });
+  }, [appointments]);
 
   async function fetchAppointments() {
     setLoading(true);
@@ -171,19 +172,52 @@ export default function Appointments() {
       return;
     }
 
-    let finalDatetime = dateText;
-    if (timeText) {
-      finalDatetime = `${dateText} ${timeText}`;
+    // Parse dateText expected as MM/DD/YYYY
+    const dateMatch = dateText.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!dateMatch) {
+      Alert.alert('Invalid Date', 'Please check the date format (MM/DD/YYYY).');
+      return;
     }
-    const d = new Date(finalDatetime);
+    const [, mm, dd, yyyy] = dateMatch;
+    const monthIndex = parseInt(mm, 10) - 1;
+    const day = parseInt(dd, 10);
+    const year = parseInt(yyyy, 10);
+
+    // Default to midnight if no time provided
+    let hours = 0;
+    let minutes = 0;
+    let timeForDb = null; // will store HH:MM:SS for Supabase time column
+
+    if (timeText) {
+      // Accept formats like "H:MM AM/PM" or "HH:MM" (24h)
+      const tMatch = timeText.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+      if (!tMatch) {
+        Alert.alert('Invalid Time', 'Please check the time format (e.g., 9:30 AM).');
+        return;
+      }
+      let [, hStr, minStr, ampm] = tMatch;
+      hours = parseInt(hStr, 10);
+      minutes = parseInt(minStr, 10);
+      if (ampm) {
+        ampm = ampm.toUpperCase();
+        if (ampm === 'AM' && hours === 12) hours = 0;
+        else if (ampm === 'PM' && hours !== 12) hours += 12;
+      }
+      const hh = String(hours).padStart(2, '0');
+      const mmStr = String(minutes).padStart(2, '0');
+      timeForDb = `${hh}:${mmStr}:00`;
+    }
+
+    const d = new Date(year, monthIndex, day, hours, minutes, 0);
     if (isNaN(d.getTime())) {
       Alert.alert('Invalid Date', 'Please check the date and time format.');
       return;
     }
+
     const datetime = d.toISOString();
 
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     try {
       const payload = {
         user_id: user.id,
@@ -191,6 +225,9 @@ export default function Appointments() {
         datetime,
         location,
       };
+
+      // If the DB has a time column we want to populate it with HH:MM:SS (24h). If not provided, send null.
+      payload.time = timeForDb; // can be null
 
       let error;
       if (editingId) {
