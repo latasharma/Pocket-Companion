@@ -123,13 +123,13 @@ export default function ChatScreen() {
         await MemoryService.initializeUserMemory(user.id);
 
         // Load recent conversations (request a larger history for full chat display)
-        const conversations = await MemoryService.loadConversations(user.id, 50);
+        const conversations = await MemoryService.loadConversations(user.id, 1);
         console.log('Loaded conversations from database:', conversations?.length || 0);
 
         if (Array.isArray(conversations) && conversations.length > 0) {
-          // Ensure messages are in expected format (array of message objects)
+          // MemoryService returns the messages array directly
           setMessages(conversations);
-          console.log('Set messages from database');
+          console.log('Set messages from database (restored history)');
         } else {
           // If no database conversations, try AsyncStorage
           console.log('No database conversations, trying AsyncStorage...');
@@ -573,7 +573,7 @@ const fetchUserProfile = async () => {
       // Get AI response
       console.log('🤖 Calling AI service for voice message...', userProfile);
       const response = await AIService.sendMessage(
-        voiceText,
+        voiceText + " (System Note: Please vary your vocabulary and avoid repeatedly using words like 'Great', 'Happy', 'Thrilled', 'Ah', or 'Oh' at the start of sentences.)",
         conversationHistory,
         companionName,
         deviceId,
@@ -752,7 +752,7 @@ const fetchUserProfile = async () => {
       console.log('🤖 Calling AI service for voice message...', userProfile);
       console.log('🤖 Calling AI service for voice message userProfileID...', userProfile['id']);
       const response = await AIService.sendMessage(
-        userMessage.text,
+        userMessage.text + " (System Note: Please vary your vocabulary and avoid repeatedly using words like 'Great', 'Happy', 'Thrilled', 'Ah', or 'Oh' at the start of sentences.)",
         conversationHistory,
         companionName,
         deviceId,
