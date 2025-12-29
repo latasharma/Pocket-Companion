@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   SafeAreaView,
   StyleSheet,
@@ -832,19 +833,141 @@ const fetchUserProfile = async () => {
     }
   };
 
-  const renderMessage = ({ item }) => (
-    <View style={[
-      styles.messageContainer,
-      item.sender === 'user' ? styles.userMessage : styles.aiMessage
-    ]}>
-      <Text style={[
-        styles.messageText,
-        item.sender === 'user' ? styles.userMessageText : styles.aiMessageText
+
+  const parseMarkdownLinks = (text) => {
+    const parts = [];
+    // Regex to match markdown links: [text](url)
+    const markdownLinkRegex = /\[([^\]]+)\]\(https?:\/\/[^\)]+\)/g;
+    // Regex to match plain URLs
+    const plainUrlRegex = /(https?:\/\/[^\s)]+)/g;
+    
+    let lastIndex = 0;
+    let match;
+
+    // First, handle markdown links [text](url)
+    const markdownRegex = new RegExp(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g);
+    
+    while ((match = markdownRegex.exec(text)) !== null) {
+      // Add text before the markdown link
+      if (match.index > lastIndex) {
+        parts.push({ 
+          type: 'text', 
+          content: text.slice(lastIndex, match.index) 
+        });
+      }
+      
+      // Add the markdown link (with display text and URL)
+      parts.push({ 
+        type: 'link', 
+        displayText: match[1], 
+        url: match[2] 
+      });
+      
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      const remaining = text.slice(lastIndex);
+      
+      // Check if remaining text has plain URLs (but not already parsed as markdown)
+      let remainingLastIndex = 0;
+      const plainRegex = new RegExp(/(https?:\/\/[^\s)]+)/g);
+      let plainMatch;
+      
+      while ((plainMatch = plainRegex.exec(remaining)) !== null) {
+        // Add text before URL
+        if (plainMatch.index > remainingLastIndex) {
+          parts.push({ 
+            type: 'text', 
+            content: remaining.slice(remainingLastIndex, plainMatch.index) 
+          });
+        }
+        
+        // Add plain URL
+        parts.push({ 
+          type: 'link', 
+          displayText: plainMatch[0], 
+          url: plainMatch[0] 
+        });
+        
+        remainingLastIndex = plainMatch.index + plainMatch[0].length;
+      }
+      
+      // Add any final remaining text
+      if (remainingLastIndex < remaining.length) {
+        parts.push({ 
+          type: 'text', 
+          content: remaining.slice(remainingLastIndex) 
+        });
+      }
+    }
+
+    return parts.length > 0 ? parts : [{ type: 'text', content: text }];
+  };
+
+  const renderMessage = ({ item }) => {
+    const parts = parseMarkdownLinks(item.text);
+
+    return (
+      <View style={[
+        styles.messageContainer,
+        item.sender === 'user' ? styles.userMessage : styles.aiMessage
       ]}>
-          {item.text}
-        </Text>
-    </View>
-  );
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          {parts.map((part, idx) => {
+            if (part.type === 'link') {
+              return (
+                <TouchableOpacity
+                  key={`link-${idx}`}
+                  onPress={() => {
+                    console.log('Opening URL:', part.url);
+                    Linking.openURL(part.url).catch(err => {
+                      console.error('Failed to open URL:', err);
+                      Alert.alert('Error', 'Could not open URL');
+                    });
+                  }}
+                  activeOpacity={0.6}
+                >
+                  <Text
+                    style={[
+                      styles.messageText,
+                      item.sender === 'user' ? styles.userMessageText : styles.aiMessageText,
+                      { 
+                        color: item.sender === 'user' ? '#87CEEB' : '#2563EB',
+                        textDecorationLine: 'underline',
+                        paddingHorizontal: 0,
+                        marginHorizontal: 0,
+                      }
+                    ]}
+                  >
+                    {part.displayText}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
+
+            // Regular text
+            if (part.content) {
+              return (
+                <Text
+                  key={`text-${idx}`}
+                  style={[
+                    styles.messageText,
+                    item.sender === 'user' ? styles.userMessageText : styles.aiMessageText
+                  ]}
+                >
+                  {part.content}
+                </Text>
+              );
+            }
+
+            return null;
+          })}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
