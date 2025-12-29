@@ -9,6 +9,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
 import { VoiceInputService } from '@/lib/voiceInputService';
+import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 
 export default function ImportantDatesScreen() {
   const router = useRouter();
@@ -41,70 +42,35 @@ export default function ImportantDatesScreen() {
   minDate.setHours(0, 0, 0, 0);
 
   useEffect(() => {
-    // requestNotificationPermission();
+    requestNotificationPermission();
     fetchImportantDates();
   }, []);
 
-  // useEffect(() => {
-  //   const today = new Date();
+  useEffect(() => {
+    importantDates.forEach((item) => {
+      if (!item.date) return;
+      
+      const eventDate = new Date(item.date);
+      
+      // Check if date is valid
+      if (isNaN(eventDate.getTime())) return;
 
-  //   importantDates.forEach((item) => {
-  //     if (!item.date) return;
-  //     console.log('Appointments updated, scheduling notifications for', item.date);
+      // Safety: skip past dates
+      if (eventDate < new Date()) {
+        return;
+      }
+      
+      console.log('Scheduling notification for', item.title, 'at', eventDate.toString());
 
-  //     // const date = new Date(item.date);
-  //     // date.setHours(9, 0, 0);
-  //     // 🔔 Test notification after 5 minutes (timezone-safe)
-  //     // const testDate = new Date(Date.now() + 5 * 60 * 1000);
-  //     //testDate.setMinutes(testDate.getMinutes() + 5);
-
-  //     // console.log(
-  //     //   '[TEST NOTIFICATION]',
-  //     //   item.title,
-  //     //   testDate.toString()
-  //     // );
-
-  //     const eventDate = buildLocalMorningDate(item.date, 8, 0);
-  //     // const eventDate = new Date(Date.now() + 2 * 60 * 1000);
-  //     console.log(
-  //       'Scheduling important date notification:',
-  //       item.title,
-  //       'at',
-  //       eventDate.toString()
-  //     );
-
-  //     // const triggerDate = new Date();
-  //     // triggerDate.setMinutes(triggerDate.getMinutes() + 2);
-  //     // console.log(
-  //     //   'Scheduling important date notification:',
-  //     //   item.title,
-  //     //   'at',
-  //     //   triggerDate.toString()
-  //     // );
-
-  //     // ✅ Only TODAY
-  //   if (!isSameLocalDay(eventDate, today)) {
-  //     return;
-  //   }
-
-  //     // Safety: skip past dates
-  //     if (eventDate < new Date()) {
-  //       console.log(
-  //         'Skipping past important date:',
-  //         item.title
-  //       );
-  //       return;
-  //     }
-
-  //     scheduleNotification({
-  //       id: `important-date-${item.id}`,
-  //       title: 'Important Date',
-  //       body: item.title,
-  //       date: eventDate,
-  //       type: 'important_date',
-  //     });
-  //   });
-  // }, [importantDates]);
+      scheduleNotification({
+        id: `important-date-${item.id}`,
+        title: 'Important Date',
+        body: item.title,
+        date: eventDate,
+        type: 'important_date',
+      });
+    });
+  }, [importantDates]);
 
   async function fetchImportantDates() {
     setLoading(true);
@@ -234,6 +200,9 @@ export default function ImportantDatesScreen() {
     let finalDate = date.trim();
     if (time.trim()) {
       finalDate = `${date.trim()} ${time.trim()}`;
+    } else {
+      // Default to 9:00 AM if no time is selected
+      finalDate = `${date.trim()} 09:00 AM`;
     }
     const d = new Date(finalDate);
     if (!isNaN(d.getTime())) {
