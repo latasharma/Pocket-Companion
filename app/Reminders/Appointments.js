@@ -5,10 +5,10 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  FlatList,
   Modal,
   Platform,
   SafeAreaView,
-  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -32,7 +32,6 @@ export default function Appointments() {
   // Modal visibility for manual entry
   const [showManualDialog, setShowManualDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [collapsedSections, setCollapsedSections] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
@@ -44,29 +43,6 @@ export default function Appointments() {
   minDate.setHours(0, 0, 0, 0);
 
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
-
-  const rawSections = appointments.reduce((acc, item) => {
-    const type = item.event_type || 'General';
-    const existingSection = acc.find((section) => section.title === type);
-    if (existingSection) {
-      existingSection.data.push(item);
-    } else {
-      acc.push({ title: type, data: [item] });
-    }
-    return acc;
-  }, []).sort((a, b) => a.title.localeCompare(b.title));
-
-  const sections = rawSections.map(section => ({
-    ...section,
-    data: collapsedSections[section.title] ? [] : section.data
-  }));
-
-  const toggleSection = (title) => {
-    setCollapsedSections(prev => ({
-      ...prev,
-      [title]: !prev[title]
-    }));
-  };
 
   useEffect(() => {
     requestNotificationPermission();
@@ -93,7 +69,7 @@ export default function Appointments() {
   async function fetchAppointments() {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('appointments').select('*').order('id', { ascending: false });
+      const { data, error } = await supabase.from('appointments').select('*').order('created_at', { ascending: false });
       if (error) {
         console.warn('Supabase fetch appointments error:', error);
         //Alert.alert('Error', 'Unable to fetch appointments from the database.');
@@ -520,31 +496,12 @@ export default function Appointments() {
           {loading ? (
             <Text style={styles.placeholder}>Loading...</Text>
           ) : appointments && appointments.length > 0 ? (
-            <SectionList
-              sections={sections}
+            <FlatList
+              data={appointments}
               keyExtractor={(i) => String(i.id)}
               renderItem={renderAppointmentItem}
-              renderSectionHeader={({ section: { title } }) => {
-                const { icon, color } = getEventUI(title);
-                return (
-                <TouchableOpacity 
-                  style={[styles.sectionHeaderContainer, { borderLeftColor: color }]} 
-                  onPress={() => toggleSection(title)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.sectionHeaderLeft}>
-                    <View style={[styles.sectionIconContainer, { backgroundColor: `${color}15` }]}>
-                      <Ionicons name={icon} size={24} color={color} />
-                    </View>
-                    <Text style={styles.sectionHeader}>{title}</Text>
-                  </View>
-                  <Ionicons name={collapsedSections[title] ? "chevron-down" : "chevron-up"} size={24} color="#9ca3af" />
-                </TouchableOpacity>
-              );
-              }}
               contentContainerStyle={styles.listContent}
               style={styles.list}
-              stickySectionHeadersEnabled={false}
             />
           ) : (
             <View style={styles.placeholderContainer}>
