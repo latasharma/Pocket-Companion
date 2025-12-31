@@ -63,6 +63,14 @@ export default function ImportantDatesScreen() {
         return;
       }
 
+      // Set time from database or default to 8 PM (20:00)
+      if (item.time) {
+        const [hours, minutes, seconds] = item.time.split(':').map(Number);
+        eventDate.setHours(hours, minutes, seconds || 0, 0);
+      } else {
+        eventDate.setHours(20, 0, 0, 0);
+      }
+
       const type = item.reminder_type || '24_hours';
       const now = new Date();
 
@@ -391,6 +399,7 @@ export default function ImportantDatesScreen() {
         title: title.trim(),
         date: formattedDate, // Always in MM/DD/YYYY format
         reminder_type: reminderType,
+        time: '18:00:00',
       };
 
       console.log('Saving important date:', payload);
