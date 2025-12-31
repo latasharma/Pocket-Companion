@@ -37,9 +37,6 @@ export default function ImportantDatesScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingField, setRecordingField] = useState(null); // 'title' | 'date' | null
 
-  const minDate = new Date();
-  minDate.setHours(0, 0, 0, 0);
-
   const reminderOptions = [
     { id: '1_week', label: '1 Week Before', icon: 'calendar' },
     { id: '24_hours', label: '24 Hours Before', icon: 'time' },
@@ -521,9 +518,15 @@ export default function ImportantDatesScreen() {
               <>
                 <View style={styles.topActions}>
                   <TouchableOpacity style={[styles.topActionButton, { backgroundColor: '#10b981' }]} onPress={() => {
+                    setTitle('');
+                    setDate('');
+                    setReminderType('24_hours');
+                    setEditingId(null);
+                    setPickerDate(new Date());
                     setShowVoiceDialog(true);
                     setShowManualDialog(false);
                     setShowManualForm(false);
+                    setShowVoiceForm(false);
                   }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Ionicons name="mic" size={18} color="#fff" style={{ marginRight: 8 }} />
@@ -540,6 +543,7 @@ export default function ImportantDatesScreen() {
                     setPickerDate(new Date());
                     setShowVoiceForm(false);
                     setShowManualForm(false);
+                    setShowVoiceDialog(false);
                   }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Ionicons name="pencil" size={18} color="#fff" style={{ marginRight: 8 }} />
@@ -669,7 +673,6 @@ export default function ImportantDatesScreen() {
                         display="spinner"
                         onChange={onDateChange}
                         style={{ backgroundColor: 'white' }}
-                        minimumDate={minDate}
                       />
                     )}
                   </View>
@@ -683,7 +686,6 @@ export default function ImportantDatesScreen() {
                 mode="date"
                 display="default"
                 onChange={onDateChange}
-                minimumDate={minDate}
               />
             )}
           </Modal>
@@ -765,7 +767,6 @@ export default function ImportantDatesScreen() {
                         display="spinner"
                         onChange={onDateChange}
                         style={{ backgroundColor: 'white' }}
-                        minimumDate={minDate}
                       />
                     )}
                   </View>
@@ -779,7 +780,6 @@ export default function ImportantDatesScreen() {
                 mode="date"
                 display="default"
                 onChange={onDateChange}
-                minimumDate={minDate}
               />
             )}
           </Modal>
