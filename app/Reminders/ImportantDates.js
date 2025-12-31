@@ -399,7 +399,7 @@ export default function ImportantDatesScreen() {
         title: title.trim(),
         date: formattedDate, // Always in MM/DD/YYYY format
         reminder_type: reminderType,
-        time: '20:00:00',
+        time: '08:00:00',
       };
 
       console.log('Saving important date:', payload);
