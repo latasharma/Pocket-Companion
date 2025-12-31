@@ -20,6 +20,7 @@ import RNCalendarEvents from 'react-native-calendar-events';
 
 const { width } = Dimensions.get('window');
 const TIME_COL_WIDTH = 50;
+const DAY_ITEM_WIDTH = 64;
 const DAY_COL_WIDTH = (width - TIME_COL_WIDTH) / 7;
 const HOUR_HEIGHT = 60;
 
@@ -35,6 +36,11 @@ export default function Appointments() {
     return d;
   });
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
@@ -119,6 +125,71 @@ export default function Appointments() {
   const weekDays = getWeekDays();
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
+  const getMonthDays = (date) => {
+    const days = [];
+    const d = new Date(date.getFullYear(), date.getMonth(), 1);
+    const month = d.getMonth();
+    while (d.getMonth() === month) {
+      days.push(new Date(d));
+      d.setDate(d.getDate() + 1);
+    }
+    return days;
+  };
+
+  const monthDays = getMonthDays(visibleMonth || new Date());
+  const monthScrollRef = useRef(null);
+
+  // Center the month/day strip on the selected date (usually today) when the
+  // screen is first opened. This ensures the current day is visible by default.
+  useEffect(() => {
+    if (!monthScrollRef.current) return;
+    const index = monthDays.findIndex(d => isSelected(d) || isToday(d));
+    if (index >= 0) {
+      const x = index * DAY_ITEM_WIDTH - (width / 2) + (DAY_ITEM_WIDTH / 2);
+      monthScrollRef.current.scrollTo({ x: Math.max(0, x), animated: false });
+    }
+  }, []);
+
+  // When events load or selectedDate changes, ensure the time grid is scrolled
+  // vertically so events for the selected day are visible. Scroll to the
+  // earliest event of the day (with some top padding) or fall back to 8 AM.
+  useEffect(() => {
+    if (!scrollViewRef.current) return;
+    const dayEvents = events.filter(e => {
+      const eStart = new Date(e.startDate);
+      return eStart.getDate() === selectedDate.getDate() &&
+        eStart.getMonth() === selectedDate.getMonth() &&
+        eStart.getFullYear() === selectedDate.getFullYear() &&
+        !e.allDay;
+    });
+
+    if (dayEvents.length > 0) {
+      const earliest = dayEvents.reduce((min, e) => {
+        return new Date(e.startDate) < new Date(min.startDate) ? e : min;
+      }, dayEvents[0]);
+      const s = new Date(earliest.startDate);
+      const top = (s.getHours() * HOUR_HEIGHT) + ((s.getMinutes() / 60) * HOUR_HEIGHT);
+      const offset = Math.max(0, top - HOUR_HEIGHT); // show some context above
+      scrollViewRef.current.scrollTo({ y: offset, animated: true });
+    } else {
+      scrollViewRef.current.scrollTo({ y: 8 * HOUR_HEIGHT, animated: false });
+    }
+  }, [events, selectedDate]);
+
+  const setCurrentDateToWeekContaining = (date) => {
+    const newDate = new Date(date);
+    newDate.setDate(newDate.getDate() - newDate.getDay());
+    setCurrentDate(newDate);
+    // keep visible month in sync with selected date
+    setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+  };
+
+  useEffect(() => {
+    if (selectedDate) {
+      setCurrentDateToWeekContaining(selectedDate);
+    }
+  }, [selectedDate]);
+
   const isToday = (date) => {
     const today = new Date();
     return date.getDate() === today.getDate() &&
@@ -139,9 +210,10 @@ export default function Appointments() {
   };
 
   const changeMonth = (offset) => {
-    const newDate = new Date(currentDate);
+    const newDate = new Date(visibleMonth);
     newDate.setDate(1);
     newDate.setMonth(newDate.getMonth() + offset);
+    setVisibleMonth(newDate);
     setCurrentDate(newDate);
   };
 
@@ -182,7 +254,7 @@ export default function Appointments() {
     });
   };
 
-  const monthLabel = weekDays[0].toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const monthLabel = visibleMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -205,28 +277,33 @@ export default function Appointments() {
               <Ionicons name="chevron-forward" size={24} color="#333" />
             </TouchableOpacity>
           </View>
-          {/* Week Header */}
-          <View style={styles.weekHeader}>
-            <View style={{ width: TIME_COL_WIDTH }} />
-            {weekDays.map((day, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.dayHeader}
-                onPress={() => {
-                  setSelectedDate(day);
-                  setCurrentDate(day);
-                }}
-              >
-                <Text style={[styles.dayName, isSelected(day) && styles.selectedDayText]}>{day.toLocaleDateString('en-US', { weekday: 'narrow' })}</Text>
-                <View style={[
-                  styles.dayNumberContainer, 
-                  isToday(day) && styles.todayCircle,
-                  isSelected(day) && !isToday(day) && styles.selectedCircle
-                ]}>
-                  <Text style={[styles.dayNumber, isToday(day) && styles.todayText, isSelected(day) && !isToday(day) && styles.selectedDayNumberText]}>{day.getDate()}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+
+          {/* Month Days Strip */}
+          <View style={styles.monthDaysWrapper}>
+            <ScrollView
+              ref={monthScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.monthDaysScroll}
+            >
+              {monthDays.map((day, idx) => {
+                const selected = isSelected(day);
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.dayItem, selected && styles.dayItemSelected]}
+                    onPress={() => { setSelectedDate(day); setCurrentDateToWeekContaining(day); }}
+                  >
+                    <Text style={[styles.dayItemWeekday, selected && styles.dayItemWeekdaySelected]}>
+                      {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                    </Text>
+                    <View style={[styles.dayNumberContainer, isToday(day) && styles.todayCircle, selected && !isToday(day) && styles.selectedCircle]}>
+                      <Text style={[styles.dayNumber, isToday(day) && styles.todayText, selected && !isToday(day) && styles.selectedDayNumberText]}>{day.getDate()}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           {/* Scrollable Grid */}
@@ -250,10 +327,10 @@ export default function Appointments() {
                   {hours.map((hour) => (
                     <View key={hour} style={styles.gridCell} />
                   ))}
-                  
+
                   {/* Events */}
                   {renderEventsForDay(day)}
-                  
+
                   {/* Current Time Indicator (if today) */}
                   {isToday(day) && (
                     <View 
@@ -269,7 +346,7 @@ export default function Appointments() {
               ))}
             </View>
           </ScrollView>
-          
+
           {loading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#10b981" />
@@ -375,6 +452,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   selectedDayNumberText: {
+    color: '#1a73e8',
+    fontWeight: '600',
+  },
+  monthDaysWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+    backgroundColor: '#fff',
+  },
+  monthDaysScroll: {
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  dayItem: {
+    width: DAY_ITEM_WIDTH,
+    alignItems: 'center',
+    marginHorizontal: 6,
+  },
+  dayItemSelected: {
+    // subtle background for selected day
+  },
+  dayItemWeekday: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 6,
+  },
+  dayItemWeekdaySelected: {
     color: '#1a73e8',
     fontWeight: '600',
   },
