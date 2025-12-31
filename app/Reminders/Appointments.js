@@ -7,6 +7,7 @@ import {
   Alert,
   Dimensions,
   Linking,
+  PanResponder,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -28,7 +29,12 @@ export default function Appointments() {
 
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
 
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay());
+    return d;
+  });
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
@@ -45,6 +51,21 @@ export default function Appointments() {
       }, 100);
     }
   }, []);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 20;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dx > 50) {
+          changeWeek(-1);
+        } else if (gestureState.dx < -50) {
+          changeWeek(1);
+        }
+      },
+    })
+  ).current;
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -87,7 +108,6 @@ export default function Appointments() {
   const getWeekDays = () => {
     const days = [];
     const start = new Date(currentDate);
-    start.setDate(currentDate.getDate() - currentDate.getDay());
     for (let i = 0; i < 7; i++) {
       const d = new Date(start);
       d.setDate(d.getDate() + i);
@@ -106,9 +126,22 @@ export default function Appointments() {
       date.getFullYear() === today.getFullYear();
   };
 
+  const isSelected = (date) => {
+    return date.getDate() === selectedDate.getDate() &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear();
+  };
+
   const changeWeek = (offset) => {
     const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + (offset * 7));
+    newDate.setDate(newDate.getDate() + offset);
+    setCurrentDate(newDate);
+  };
+
+  const changeMonth = (offset) => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(1);
+    newDate.setMonth(newDate.getMonth() + offset);
     setCurrentDate(newDate);
   };
 
@@ -162,13 +195,13 @@ export default function Appointments() {
           <View style={{ width: 40 }} />
         </View>
 
-        <View style={styles.content}>
+        <View style={styles.content} {...panResponder.panHandlers}>
           <View style={styles.monthNavigation}>
-            <TouchableOpacity onPress={() => changeWeek(-1)} style={styles.navButton}>
+            <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.navButton}>
               <Ionicons name="chevron-back" size={24} color="#333" />
             </TouchableOpacity>
             <ThemedText type="subtitle" style={[styles.monthLabel, { fontFamily: uiFontFamily }]}>{monthLabel}</ThemedText>
-            <TouchableOpacity onPress={() => changeWeek(1)} style={styles.navButton}>
+            <TouchableOpacity onPress={() => changeMonth(1)} style={styles.navButton}>
               <Ionicons name="chevron-forward" size={24} color="#333" />
             </TouchableOpacity>
           </View>
@@ -176,12 +209,23 @@ export default function Appointments() {
           <View style={styles.weekHeader}>
             <View style={{ width: TIME_COL_WIDTH }} />
             {weekDays.map((day, index) => (
-              <View key={index} style={styles.dayHeader}>
-                <Text style={styles.dayName}>{day.toLocaleDateString('en-US', { weekday: 'narrow' })}</Text>
-                <View style={[styles.dayNumberContainer, isToday(day) && styles.todayCircle]}>
-                  <Text style={[styles.dayNumber, isToday(day) && styles.todayText]}>{day.getDate()}</Text>
+              <TouchableOpacity 
+                key={index} 
+                style={styles.dayHeader}
+                onPress={() => {
+                  setSelectedDate(day);
+                  setCurrentDate(day);
+                }}
+              >
+                <Text style={[styles.dayName, isSelected(day) && styles.selectedDayText]}>{day.toLocaleDateString('en-US', { weekday: 'narrow' })}</Text>
+                <View style={[
+                  styles.dayNumberContainer, 
+                  isToday(day) && styles.todayCircle,
+                  isSelected(day) && !isToday(day) && styles.selectedCircle
+                ]}>
+                  <Text style={[styles.dayNumber, isToday(day) && styles.todayText, isSelected(day) && !isToday(day) && styles.selectedDayNumberText]}>{day.getDate()}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
@@ -321,6 +365,17 @@ const styles = StyleSheet.create({
   },
   todayText: {
     color: '#fff',
+    fontWeight: '600',
+  },
+  selectedCircle: {
+    backgroundColor: '#e0f2fe',
+  },
+  selectedDayText: {
+    color: '#1a73e8',
+    fontWeight: '600',
+  },
+  selectedDayNumberText: {
+    color: '#1a73e8',
     fontWeight: '600',
   },
   gridScrollView: {
