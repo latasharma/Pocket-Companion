@@ -585,8 +585,6 @@ export default function ImportantDatesScreen() {
           <Modal visible={showVoiceDialog} animationType="slide" transparent={true} onRequestClose={() => setShowVoiceDialog(false)}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <ThemedText style={styles.modalTitle}>Add Important Date (Voice)</ThemedText>
-
                 <ThemedText style={styles.label}>Title</ThemedText>
                 <View style={styles.row}>
                   <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Mom's Birthday" style={[styles.modalInput, { color: textColor, flex: 1 }]} />
@@ -695,8 +693,6 @@ export default function ImportantDatesScreen() {
           <Modal visible={showManualDialog} animationType="slide" transparent={true} onRequestClose={() => setShowManualDialog(false)}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <ThemedText style={styles.modalTitle}>{editingId ? 'Edit Important Date' : 'Add Important Date'}</ThemedText>
-
                 <ThemedText style={styles.label}>Title</ThemedText>
                 <TextInput value={title} onChangeText={setTitle} placeholder="e.g., Anniversary" style={[styles.modalInput, { color: textColor }]} />
 
