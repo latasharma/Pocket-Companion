@@ -273,87 +273,177 @@ export default function ImportantDatesScreen() {
     setShowManualForm(false);
   };
 
-  const handleSave = async () => {
-  if (!title.trim() || !date.trim()) {
-    Alert.alert('Missing fields', 'Please enter both a title and a date.');
-    return;
-  }
-
-  let d;
-  // Robust date parsing (MM/DD/YYYY)
-  const dateParts = date.trim().split('/');
-  if (dateParts.length === 3) {
-    // Note: new Date(y, m, d) creates a local date at 00:00:00
-    d = new Date(
-      parseInt(dateParts[2], 10),
-      parseInt(dateParts[0], 10) - 1,
-      parseInt(dateParts[1], 10)
-    );
-  } else {
-    d = new Date(date.trim());
-  }
-
-  if (isNaN(d.getTime())) {
-    Alert.alert('Invalid Date', 'Please check the date format.');
-    return;
-  }
-
-  d.setHours(9, 0, 0, 0);
-
-  const finalDate = d.toISOString();
-
-  setSaving(true);
-  const { data: { user } } = await supabase.auth.getUser();
-
-  try {
-    const payload = {
-      user_id: user.id,
-      title: title.trim(),
-      date: finalDate,
-      reminder_type: reminderType,
-    };
-
-    console.log('Saving important date:', payload);
-
-    let error;
-    if (editingId) {
-      const { error: updateError } = await supabase.from('important_dates').update(payload).eq('id', editingId);
-      error = updateError;
-    } else {
-      payload.created_at = new Date().toISOString();
-      const { error: insertError } = await supabase.from('important_dates').insert([payload]);
-      error = insertError;
+  const parseAndFormatDate = (dateInput) => {
+    if (!dateInput || !dateInput.trim()) {
+      return null;
     }
 
-    if (error) {
-      console.error('Supabase insert error', error);
-      Alert.alert('Error', 'Unable to save the date.');
+    let d;
+    const input = dateInput.trim();
+
+    // 1. Try MM/DD/YYYY format first (manual input)
+    const mmDdYyyyMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(input);
+    if (mmDdYyyyMatch) {
+      const [, month, day, year] = mmDdYyyyMatch;
+      d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+      if (!isNaN(d.getTime())) {
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${mm}/${dd}/${yyyy}`;
+      }
+    }
+
+    // 2. Try YYYY-MM-DD format (ISO)
+    const isoMatch = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/.exec(input);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
+      d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+      if (!isNaN(d.getTime())) {
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${mm}/${dd}/${yyyy}`;
+      }
+    }
+
+    // 3. Handle voice input formats and natural language dates
+    let cleanDate = input
+      // Remove ordinal suffixes (st, nd, rd, th)
+      .replace(/(\d+)(st|nd|rd|th)/gi, '$1')
+      // Fix Indonesian month names
+      .replace(/Desember/gi, 'December')
+      .replace(/Januari/gi, 'January')
+      .replace(/Februari/gi, 'February')
+      .replace(/Maret/gi, 'March')
+      .replace(/Mei/gi, 'May')
+      .replace(/Juni/gi, 'June')
+      .replace(/Juli/gi, 'July')
+      .replace(/Agustus/gi, 'August')
+      .replace(/Oktober/gi, 'October')
+      .replace(/Nopember/gi, 'November')
+      // Fix common typos
+      .replace(/Septemebr/gi, 'September')
+      .replace(/Septembr/gi, 'September');
+
+    d = new Date(cleanDate);
+
+    // If parsing failed, try to extract numbers and guess the format
+    if (isNaN(d.getTime())) {
+      const numbers = input.match(/\d+/g);
+      if (numbers && numbers.length >= 3) {
+        // Assume the format is likely MM/DD/YYYY or DD/MM/YYYY or YYYY/MM/DD
+        // Try creating a date with different combinations
+        const num1 = parseInt(numbers[0], 10);
+        const num2 = parseInt(numbers[1], 10);
+        const num3 = parseInt(numbers[2], 10);
+
+        // If first number is 4 digits, it's likely the year
+        if (num1 > 31) {
+          d = new Date(num1, num2 - 1, num3);
+        }
+        // If last number is 4 digits, it's likely the year
+        else if (num3 > 31) {
+          // Try MM/DD/YYYY first
+          d = new Date(num3, num1 - 1, num2);
+          // If month is invalid, try DD/MM/YYYY
+          if (d.getMonth() !== num1 - 1) {
+            d = new Date(num3, num2 - 1, num1);
+          }
+        }
+        // If second number is 4 digits, it's likely the year
+        else if (num2 > 31) {
+          d = new Date(num2, num1 - 1, num3);
+        }
+      }
+    }
+
+    // If still invalid, try Date constructor one more time with the cleaned input
+    if (isNaN(d.getTime())) {
+      d = new Date(cleanDate);
+    }
+
+    // If date is still invalid, return today's date as fallback
+    if (isNaN(d.getTime())) {
+      d = new Date();
+    }
+
+    // Format as MM/DD/YYYY
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+
+    return `${mm}/${dd}/${yyyy}`;
+  };
+
+  const handleSave = async () => {
+    if (!title.trim() || !date.trim()) {
+      Alert.alert('Missing fields', 'Please enter both a title and a date.');
       return;
     }
 
-    if (editingId) {
-      // Cancel existing notifications before rescheduling (handles case where reminder type changed)
-      await cancelScheduledNotification(`important-date-${editingId}-1_week`);
-      await cancelScheduledNotification(`important-date-${editingId}-24_hours`);
-      await cancelScheduledNotification(`important-date-${editingId}-5_minutes`);
-    }
+    // Parse and format the date - will always return a valid date
+    const formattedDate = parseAndFormatDate(date);
 
-    setTitle('');
-    setDate('');
-    setReminderType('24_hours');
-    setEditingId(null);
-    setShowManualForm(false);
-    setShowVoiceForm(false);
-    setShowManualDialog(false);
-    setShowVoiceDialog(false);
-    fetchImportantDates();
-  } catch (err) {
-    console.error(err);
-    Alert.alert('Error', 'An unexpected error occurred.');
-  } finally {
-    setSaving(false);
-  }
-};
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    try {
+      const payload = {
+        user_id: user.id,
+        title: title.trim(),
+        date: formattedDate, // Always in MM/DD/YYYY format
+        reminder_type: reminderType,
+      };
+
+      console.log('Saving important date:', payload);
+
+      let error;
+      if (editingId) {
+        const { error: updateError } = await supabase
+          .from('important_dates')
+          .update(payload)
+          .eq('id', editingId);
+        error = updateError;
+      } else {
+        payload.created_at = new Date().toISOString();
+        const { error: insertError } = await supabase
+          .from('important_dates')
+          .insert([payload]);
+        error = insertError;
+      }
+
+      if (error) {
+        console.error('Supabase insert error', error);
+        Alert.alert('Error', 'Unable to save the date.');
+        return;
+      }
+
+      if (editingId) {
+        // Cancel existing notifications before rescheduling
+        await cancelScheduledNotification(`important-date-${editingId}-1_week`);
+        await cancelScheduledNotification(`important-date-${editingId}-24_hours`);
+        await cancelScheduledNotification(`important-date-${editingId}-5_minutes`);
+      }
+
+      // Reset form
+      setTitle('');
+      setDate('');
+      setReminderType('24_hours');
+      setEditingId(null);
+      setShowManualForm(false);
+      setShowVoiceForm(false);
+      setShowManualDialog(false);
+      setShowVoiceDialog(false);
+      
+      fetchImportantDates();
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const onDateChange = (event, selectedDate) => {
     if (Platform.OS === 'android') {
