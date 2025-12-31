@@ -158,19 +158,20 @@ export default function Appointments() {
           <TouchableOpacity onPress={handleBack} style={styles.backButton} accessibilityLabel="Back">
             <Ionicons name='arrow-back' size={24} color="#10b981" />
           </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <TouchableOpacity onPress={() => changeWeek(-1)}>
-              <Ionicons name="chevron-back" size={24} color="#333" />
-            </TouchableOpacity>
-            <ThemedText type="title" style={[styles.headerTitle, { fontFamily: uiFontFamily }]}>{monthLabel}</ThemedText>
-            <TouchableOpacity onPress={() => changeWeek(1)}>
-              <Ionicons name="chevron-forward" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
+          <ThemedText type="title" style={[styles.headerTitle, { fontFamily: uiFontFamily }]}>Appointments</ThemedText>
           <View style={{ width: 40 }} />
         </View>
 
         <View style={styles.content}>
+          <View style={styles.monthNavigation}>
+            <TouchableOpacity onPress={() => changeWeek(-1)} style={styles.navButton}>
+              <Ionicons name="chevron-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <ThemedText type="subtitle" style={[styles.monthLabel, { fontFamily: uiFontFamily }]}>{monthLabel}</ThemedText>
+            <TouchableOpacity onPress={() => changeWeek(1)} style={styles.navButton}>
+              <Ionicons name="chevron-forward" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
           {/* Week Header */}
           <View style={styles.weekHeader}>
             <View style={{ width: TIME_COL_WIDTH }} />
@@ -256,15 +257,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e5e5e5',
   },
-  headerCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
   backButton: {
     padding: 8,
   },
   headerTitle: {
+    flex: 1,
     fontSize: 20,
     fontWeight: '600',
     color: '#111827',
@@ -272,6 +269,24 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  monthNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  monthLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginHorizontal: 16,
+    color: '#111827',
+  },
+  navButton: {
+    padding: 4,
   },
   weekHeader: {
     flexDirection: 'row',
