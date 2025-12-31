@@ -432,7 +432,7 @@ export default function ImportantDatesScreen() {
                   }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Ionicons name="mic" size={18} color="#fff" style={{ marginRight: 8 }} />
-                      <ThemedText type="defaultSemiBold" style={[styles.topActionButtonText, { color: '#fff' }]}>Add Voice</ThemedText>
+                      <ThemedText type="defaultSemiBold" style={[styles.topActionButtonText, { color: '#fff' }]}>Voice</ThemedText>
                     </View>
                   </TouchableOpacity>
 
