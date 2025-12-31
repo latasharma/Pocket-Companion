@@ -1,13 +1,16 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import { Linking } from "react-native";
+import { initializeNotificationService } from "../lib/NotificationService";
 import { supabase } from "../lib/supabase";
-import { useRouter } from "expo-router";
 
 export default function RootLayout() {
   const router = useRouter();
   
   useEffect(() => {
+
+    initializeNotificationService();
+
     let handled = false; // prevent double-handling on fast refresh
     
     // Handle deep links for password reset

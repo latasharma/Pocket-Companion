@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, AppState, FlatList, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
 import { VoiceInputService } from '@/lib/voiceInputService';
-import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
+import { cancelScheduledNotification, initializeNotificationService, scheduleNotification } from '../../lib/NotificationService';
 
 export default function ImportantDatesScreen() {
   const router = useRouter();
@@ -18,10 +18,9 @@ export default function ImportantDatesScreen() {
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reminderType, setReminderType] = useState('24_hours');
   const [pickerDate, setPickerDate] = useState(new Date());
 
   const [importantDates, setImportantDates] = useState([]);
@@ -41,48 +40,112 @@ export default function ImportantDatesScreen() {
   const minDate = new Date();
   minDate.setHours(0, 0, 0, 0);
 
+  const reminderOptions = [
+    { id: '1_week', label: '1 Week Before', icon: 'calendar' },
+    { id: '24_hours', label: '24 Hours Before', icon: 'time' },
+    { id: '5_minutes', label: '5 Minutes Before', icon: 'alarm' },
+    { id: 'all', label: 'All of the above', icon: 'notifications' },
+  ];
+
   useEffect(() => {
-    requestNotificationPermission();
+    initializeNotificationService();
     fetchImportantDates();
   }, []);
 
   useEffect(() => {
+    if (importantDates.length === 0) return;
+
     importantDates.forEach((item) => {
       if (!item.date) return;
       
       const eventDate = new Date(item.date);
       
       // Check if date is valid
-      if (isNaN(eventDate.getTime())) return;
-
-      // If time field exists, use it to set the exact time
-      if (item.time) {
-        const timeParts = item.time.split(':');
-        if (timeParts.length >= 2) {
-          const hours = parseInt(timeParts[0], 10);
-          const minutes = parseInt(timeParts[1], 10);
-          
-          // Set the exact hours and minutes from the time field
-          eventDate.setHours(hours, minutes, 0, 0);
-        }
-      }
-      
-      // Safety: skip past dates
-      if (eventDate < new Date()) {
+      if (isNaN(eventDate.getTime())) {
+        console.warn(`Invalid date for item ${item.id}: ${item.date}`);
         return;
       }
 
-      console.log('Scheduling notification for', item.title, 'at', eventDate.toString());
+      const type = item.reminder_type || '24_hours';
+      const now = new Date();
 
-      scheduleNotification({
-        id: `important-date-${item.id}`,
-        title: 'Important Date',
-        body: item.title,
-        date: eventDate,
-        type: 'important_date',
-      });
+      // Define time offsets
+      const offsets = {
+        '1_week': 7 * 24 * 60 * 60 * 1000,
+        '24_hours': 24 * 60 * 60 * 1000,
+        '5_minutes': 5 * 60 * 1000,
+      };
+
+      // Messages for each reminder type
+      const messages = {
+        '1_week': 'In 1 week',
+        '24_hours': 'Tomorrow',
+        '5_minutes': 'In 5 minutes',
+      };
+
+      const schedule = (reminderKey, offsetMs) => {
+        const triggerDate = new Date(eventDate.getTime() - offsetMs);
+        const notificationId = `important-date-${item.id}-${reminderKey}`;
+        
+        // Only schedule if the trigger date is in the future
+        if (triggerDate > now) {
+          console.log(
+            `✅ Scheduling notification: "${item.title}" - ${messages[reminderKey]} (${triggerDate.toISOString()})`
+          );
+          
+          scheduleNotification({
+            id: notificationId,
+            title: 'Important Date Reminder',
+            body: `${messages[reminderKey]}: ${item.title}`,
+            date: triggerDate,
+            type: 'important_date',
+            data: {
+              dateId: item.id,
+              dateTitle: item.title,
+              originalDate: item.date,
+              reminderType: reminderKey,
+            },
+          });
+        } else {
+          console.log(
+            `⏭️  Skipping notification for "${item.title}" - ${reminderKey} (trigger date is in the past: ${triggerDate.toISOString()})`
+          );
+        }
+      };
+
+      // Schedule based on reminder type
+      if (type === '1_week') {
+        schedule('1_week', offsets['1_week']);
+      } else if (type === '24_hours') {
+        schedule('24_hours', offsets['24_hours']);
+      } else if (type === '5_minutes') {
+        schedule('5_minutes', offsets['5_minutes']);
+      } else if (type === 'all') {
+        // Schedule all three
+        schedule('1_week', offsets['1_week']);
+        schedule('24_hours', offsets['24_hours']);
+        schedule('5_minutes', offsets['5_minutes']);
+      }
     });
   }, [importantDates]);
+
+  // 2. Add this useEffect to reschedule notifications when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // 3. Add this handler function
+  const handleAppStateChange = async (state) => {
+    if (state === 'active') {
+      console.log('App came to foreground - rescheduling notifications...');
+      // Force re-fetch and reschedule
+      await fetchImportantDates();
+    }
+  };
 
   async function fetchImportantDates() {
     setLoading(true);
@@ -119,7 +182,6 @@ export default function ImportantDatesScreen() {
         (text) => {
           if (field === 'title') setTitle((t) => (t ? t + ' ' + text : text));
           else if (field === 'date') setDate((d) => (d ? d + ' ' + text : text));
-          else if (field === 'time') setTime((t) => (t ? t + ' ' + text : text));
 
           setIsRecording(false);
           setRecordingField(null);
@@ -167,8 +229,15 @@ export default function ImportantDatesScreen() {
           style: 'destructive',
           onPress: async () => {
             const { error } = await supabase.from('important_dates').delete().eq('id', id);
-            if (!error) fetchImportantDates();
-            else Alert.alert('Error', 'Failed to delete date');
+            if (!error) {
+              // Cancel any scheduled notifications for this date
+              await cancelScheduledNotification(`important-date-${id}-1_week`);
+              await cancelScheduledNotification(`important-date-${id}-24_hours`);
+              await cancelScheduledNotification(`important-date-${id}-5_minutes`);
+              fetchImportantDates();
+            } else {
+              Alert.alert('Error', 'Failed to delete date');
+            }
           },
         },
       ]
@@ -192,43 +261,7 @@ export default function ImportantDatesScreen() {
       }
     }
 
-    // Handle time field from Supabase
-    if (item.time) {
-      // item.time is in HH:MM:SS format (e.g., "15:30:00")
-      const timeParts = item.time.split(':');
-      if (timeParts.length >= 2) {
-        let hours = parseInt(timeParts[0], 10);
-        const minutes = timeParts[1];
-        
-        // Convert 24-hour format to 12-hour format with AM/PM
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? hours : 12;
-        
-        setTime(`${hours}:${minutes} ${ampm}`);
-        
-        // Also update pickerDate with the time for the time picker
-        const d = new Date(item.date);
-        if (!isNaN(d.getTime())) {
-          d.setHours(parseInt(timeParts[0], 10), parseInt(timeParts[1], 10), 0);
-          setPickerDate(d);
-        }
-      }
-    } else {
-      // Fallback if time field doesn't exist (for backward compatibility)
-      const d = new Date(item.date);
-      if (!isNaN(d.getTime())) {
-        let hours = d.getHours();
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? hours : 12;
-        setTime(`${hours}:${minutes} ${ampm}`);
-      } else {
-        setTime('');
-      }
-    }
-
+    setReminderType(item.reminder_type || '24_hours');
     setEditingId(item.id);
     setShowManualDialog(true);
     setShowVoiceForm(false);
@@ -260,39 +293,7 @@ export default function ImportantDatesScreen() {
     return;
   }
 
-  // Default time: 9:00 AM
-  let hours = 9;
-  let minutes = 0;
-  let timeString = '09:00:00'; // HH:MM:SS format for database
-
-  if (time.trim()) {
-    const timeMatch = time.trim().match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if (timeMatch) {
-      let h = parseInt(timeMatch[1], 10);
-      const m = parseInt(timeMatch[2], 10);
-      const ampm = timeMatch[3]?.toUpperCase();
-
-      if (ampm === 'PM' && h < 12) h += 12;
-      if (ampm === 'AM' && h === 12) h = 0;
-      
-      hours = h;
-      minutes = m;
-      
-      // Format time as HH:MM:SS for database storage
-      timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-    } else {
-      // Fallback for simple HH:MM
-      const simpleParts = time.trim().split(':');
-      if (simpleParts.length >= 2) {
-        hours = parseInt(simpleParts[0], 10);
-        minutes = parseInt(simpleParts[1], 10);
-        timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-      }
-    }
-  }
-
-  // Explicitly set the time, zeroing seconds and milliseconds
-  d.setHours(hours, minutes, 0, 0);
+  d.setHours(9, 0, 0, 0);
 
   const finalDate = d.toISOString();
 
@@ -304,8 +305,10 @@ export default function ImportantDatesScreen() {
       user_id: user.id,
       title: title.trim(),
       date: finalDate,
-      time: timeString, // Store time separately (HH:MM:SS format)
+      reminder_type: reminderType,
     };
+
+    console.log('Saving important date:', payload);
 
     let error;
     if (editingId) {
@@ -323,9 +326,16 @@ export default function ImportantDatesScreen() {
       return;
     }
 
+    if (editingId) {
+      // Cancel existing notifications before rescheduling (handles case where reminder type changed)
+      await cancelScheduledNotification(`important-date-${editingId}-1_week`);
+      await cancelScheduledNotification(`important-date-${editingId}-24_hours`);
+      await cancelScheduledNotification(`important-date-${editingId}-5_minutes`);
+    }
+
     setTitle('');
     setDate('');
-    setTime('');
+    setReminderType('24_hours');
     setEditingId(null);
     setShowManualForm(false);
     setShowVoiceForm(false);
@@ -353,20 +363,6 @@ export default function ImportantDatesScreen() {
     }
   };
 
-  const onTimeChange = (event, selectedDate) => {
-    if (Platform.OS === 'android') {
-      setShowTimePicker(false);
-    }
-    if (selectedDate) {
-      setPickerDate(selectedDate);
-      let hours = selectedDate.getHours();
-      const minutes = String(selectedDate.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      setTime(`${hours}:${minutes} ${ampm}`);
-    }
-  };
 
   function renderItem({ item }) {
     const formatDate = (d) => {
@@ -444,7 +440,7 @@ export default function ImportantDatesScreen() {
                     setShowManualDialog(true);
                     setTitle('');
                     setDate('');
-                    setTime('');
+                    setReminderType('24_hours');
                     setEditingId(null);
                     setPickerDate(new Date());
                     setShowVoiceForm(false);
@@ -508,7 +504,6 @@ export default function ImportantDatesScreen() {
                   <TouchableOpacity
                     style={[styles.modalInput, { flex: 1 }]}
                     onPress={() => {
-                      setShowTimePicker(false);
                       setShowDatePicker(!showDatePicker);
                     }}
                   >
@@ -524,41 +519,23 @@ export default function ImportantDatesScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <ThemedText style={styles.label}>Time</ThemedText>
-                <View style={styles.row}>
-                  <TouchableOpacity
-                    style={[styles.modalInput, { flex: 1 }]}
-                    onPress={() => {
-                      if (time) {
-                        const d = new Date();
-                        try {
-                          const [t, modifier] = time.split(' ');
-                          let [hoursStr, minutes] = t.split(':');
-                          let hours = parseInt(hoursStr, 10);
-                          if (hours === 12) hours = 0;
-                          if (modifier === 'PM') hours += 12;
-                          d.setHours(hours, parseInt(minutes, 10));
-                          setPickerDate(d);
-                        } catch (e) {
-                          setPickerDate(new Date());
-                        }
-                      } else {
-                        setPickerDate(new Date());
-                      }
-                      setShowDatePicker(false);
-                      setShowTimePicker(!showTimePicker);
-                    }}
-                  >
-                    <Text style={{ color: time ? textColor : '#9ca3af', fontSize: 16 }}>
-                      {time || 'HH:MM AM/PM'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.micButton, isRecording && recordingField === 'time' ? styles.micRecording : null]}
-                    onPress={() => (isRecording && recordingField === 'time' ? stopVoice() : startVoiceForField('time'))}
-                  >
-                    <Ionicons name="mic" size={20} color="#fff" />
-                  </TouchableOpacity>
+                <ThemedText style={styles.label}>Remind me</ThemedText>
+                <View style={styles.reminderGrid}>
+                  {reminderOptions.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[
+                        styles.reminderOption,
+                        reminderType === opt.id && styles.reminderOptionSelected
+                      ]}
+                      onPress={() => setReminderType(opt.id)}
+                    >
+                      <Ionicons name={opt.icon} size={24} color={reminderType === opt.id ? '#fff' : '#6b7280'} />
+                      <Text style={[styles.reminderOptionText, reminderType === opt.id && styles.reminderOptionTextSelected]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
 
                 <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={handleSave} accessibilityLabel="Save The Date">
@@ -572,14 +549,13 @@ export default function ImportantDatesScreen() {
             </View>
 
             {/* Date/Time Pickers */}
-            {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
+            {Platform.OS === 'ios' && showDatePicker && (
               <Modal
                 transparent={true}
                 animationType="slide"
-                visible={showDatePicker || showTimePicker}
+                visible={showDatePicker}
                 onRequestClose={() => {
                   setShowDatePicker(false);
-                  setShowTimePicker(false);
                 }}
               >
                 <View style={styles.pickerModalOverlay}>
@@ -587,7 +563,6 @@ export default function ImportantDatesScreen() {
                     <View style={styles.pickerHeader}>
                       <TouchableOpacity onPress={() => {
                         setShowDatePicker(false);
-                        setShowTimePicker(false);
                       }}>
                         <Text style={styles.pickerDoneText}>Done</Text>
                       </TouchableOpacity>
@@ -602,15 +577,6 @@ export default function ImportantDatesScreen() {
                         minimumDate={minDate}
                       />
                     )}
-                    {showTimePicker && (
-                      <DateTimePicker
-                        value={pickerDate}
-                        mode="time"
-                        display="spinner"
-                        onChange={onTimeChange}
-                        style={{ backgroundColor: 'white' }}
-                      />
-                    )}
                   </View>
                 </View>
               </Modal>
@@ -623,14 +589,6 @@ export default function ImportantDatesScreen() {
                 display="default"
                 onChange={onDateChange}
                 minimumDate={minDate}
-              />
-            )}
-            {Platform.OS === 'android' && showTimePicker && (
-              <DateTimePicker
-                value={pickerDate}
-                mode="time"
-                display="default"
-                onChange={onTimeChange}
               />
             )}
           </Modal>
@@ -649,7 +607,6 @@ export default function ImportantDatesScreen() {
                 <TouchableOpacity 
                   style={styles.modalInput} 
                   onPress={() => {
-                    setShowTimePicker(false);
                     setShowDatePicker(!showDatePicker);
                   }}
                 >
@@ -658,32 +615,24 @@ export default function ImportantDatesScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                <ThemedText style={styles.label}>Time</ThemedText>
-                <TouchableOpacity 
-                  style={styles.modalInput} 
-                  onPress={() => {
-                    if (time) {
-                      const d = new Date();
-                      try {
-                        const [t, modifier] = time.split(' ');
-                        let [hoursStr, minutes] = t.split(':');
-                        let hours = parseInt(hoursStr, 10);
-                        if (hours === 12) hours = 0;
-                        if (modifier === 'PM') hours += 12;
-                        d.setHours(hours, parseInt(minutes, 10));
-                        setPickerDate(d);
-                      } catch (e) {
-                        setPickerDate(new Date());
-                      }
-                    }
-                    setShowDatePicker(false);
-                    setShowTimePicker(!showTimePicker);
-                  }}
-                >
-                  <Text style={{ color: time ? textColor : '#9ca3af', fontSize: 16 }}>
-                    {time || 'HH:MM AM/PM'}
-                  </Text>
-                </TouchableOpacity>
+                <ThemedText style={styles.label}>Remind me</ThemedText>
+                <View style={styles.reminderGrid}>
+                  {reminderOptions.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[
+                        styles.reminderOption,
+                        reminderType === opt.id && styles.reminderOptionSelected
+                      ]}
+                      onPress={() => setReminderType(opt.id)}
+                    >
+                      <Ionicons name={opt.icon} size={24} color={reminderType === opt.id ? '#fff' : '#6b7280'} />
+                      <Text style={[styles.reminderOptionText, reminderType === opt.id && styles.reminderOptionTextSelected]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
                 <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#10b981" }]} onPress={handleSave} accessibilityLabel="Save The Date">
                   <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : (editingId ? 'Update Date' : 'Save The Date')}</ThemedText>
@@ -696,14 +645,13 @@ export default function ImportantDatesScreen() {
             </View>
 
             {/* Date/Time Pickers */}
-            {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
+            {Platform.OS === 'ios' && showDatePicker && (
               <Modal
                 transparent={true}
                 animationType="slide"
-                visible={showDatePicker || showTimePicker}
+                visible={showDatePicker}
                 onRequestClose={() => {
                   setShowDatePicker(false);
-                  setShowTimePicker(false);
                 }}
               >
                 <View style={styles.pickerModalOverlay}>
@@ -711,7 +659,6 @@ export default function ImportantDatesScreen() {
                     <View style={styles.pickerHeader}>
                       <TouchableOpacity onPress={() => {
                         setShowDatePicker(false);
-                        setShowTimePicker(false);
                       }}>
                         <Text style={styles.pickerDoneText}>Done</Text>
                       </TouchableOpacity>
@@ -726,15 +673,6 @@ export default function ImportantDatesScreen() {
                         minimumDate={minDate}
                       />
                     )}
-                    {showTimePicker && (
-                      <DateTimePicker
-                        value={pickerDate}
-                        mode="time"
-                        display="spinner"
-                        onChange={onTimeChange}
-                        style={{ backgroundColor: 'white' }}
-                      />
-                    )}
                   </View>
                 </View>
               </Modal>
@@ -747,14 +685,6 @@ export default function ImportantDatesScreen() {
                 display="default"
                 onChange={onDateChange}
                 minimumDate={minDate}
-              />
-            )}
-            {Platform.OS === 'android' && showTimePicker && (
-              <DateTimePicker
-                value={pickerDate}
-                mode="time"
-                display="default"
-                onChange={onTimeChange}
               />
             )}
           </Modal>
@@ -876,5 +806,36 @@ const styles = StyleSheet.create({
     color: '#10b981',
     fontSize: 16,
     fontWeight: '600',
+  },
+  reminderGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  reminderOption: {
+    width: '48%',
+    backgroundColor: '#f3f4f6',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginBottom: 8,
+  },
+  reminderOptionSelected: {
+    backgroundColor: '#10b981',
+    borderColor: '#059669',
+  },
+  reminderOptionText: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  reminderOptionTextSelected: {
+    color: '#fff',
   },
 });
