@@ -180,8 +180,9 @@ export default function ImportantDatesScreen() {
       // onResult will be called after stopRecording when transcription completes
       await VoiceInputService.startRecording(
         (text) => {
-          if (field === 'title') setTitle((t) => (t ? t + ' ' + text : text));
-          else if (field === 'date') setDate((d) => (d ? d + ' ' + text : text));
+          const cleanedText = text.replace(/[.,?!;:]+$/, '');
+          if (field === 'title') setTitle((t) => (t ? t + ' ' + cleanedText : cleanedText));
+          else if (field === 'date') setDate((d) => (d ? d + ' ' + cleanedText : cleanedText));
 
           setIsRecording(false);
           setRecordingField(null);
@@ -207,9 +208,13 @@ export default function ImportantDatesScreen() {
 
   const stopVoice = async () => {
     try {
-      if (!VoiceInputService.isCurrentlyRecording()) return;
-      await VoiceInputService.stopRecording();
-      // onSpeechResult handler passed earlier will update the field and clear recording state
+      if (VoiceInputService.isCurrentlyRecording()) {
+        await VoiceInputService.stopRecording();
+      } else {
+        // If service isn't recording (e.g. starting up or error), force UI reset
+        setIsRecording(false);
+        setRecordingField(null);
+      }
     } catch (err) {
       console.error('stopVoice error', err);
       Alert.alert('Error', 'Unable to stop voice recording.');
@@ -495,7 +500,7 @@ export default function ImportantDatesScreen() {
                     style={[styles.micButton, isRecording && recordingField === 'title' ? styles.micRecording : null]}
                     onPress={() => (isRecording && recordingField === 'title' ? stopVoice() : startVoiceForField('title'))}
                   >
-                    <Ionicons name="mic" size={20} color="#fff" />
+                    <Ionicons name={isRecording && recordingField === 'title' ? "stop" : "mic"} size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
 
@@ -515,7 +520,7 @@ export default function ImportantDatesScreen() {
                     style={[styles.micButton, isRecording && recordingField === 'date' ? styles.micRecording : null]}
                     onPress={() => (isRecording && recordingField === 'date' ? stopVoice() : startVoiceForField('date'))}
                   >
-                    <Ionicons name="mic" size={20} color="#fff" />
+                    <Ionicons name={isRecording && recordingField === 'date' ? "stop" : "mic"} size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
 
@@ -738,8 +743,8 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12, fontSize: 16, flex: 1, backgroundColor: '#fff' },
   modalInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12, fontSize: 16, backgroundColor: '#fff', marginBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center' },
-  micButton: { marginBottom: 10, marginLeft: 8, backgroundColor: '#ef4444', padding: 10, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  micRecording: { backgroundColor: '#f59e0b' },
+  micButton: { marginBottom: 10, marginLeft: 8, backgroundColor: '#10b981', padding: 10, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  micRecording: { backgroundColor: '#ef4444' },
   bottomActions: { position: 'absolute', left: 0, right: 0, bottom: 80, flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16 },
   bigButton: { flex: 1, marginHorizontal: 8, borderWidth: 1, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   bigButtonText: { fontSize: 16, fontWeight: '600' },
