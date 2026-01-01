@@ -7,7 +7,6 @@ import {
   Alert,
   Dimensions,
   Linking,
-  PanResponder,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -20,9 +19,12 @@ import RNCalendarEvents from 'react-native-calendar-events';
 
 const { width } = Dimensions.get('window');
 const TIME_COL_WIDTH = 50;
-const DAY_ITEM_WIDTH = 64;
+// Day column width: divide remaining width by 7 (one column per weekday)
 const DAY_COL_WIDTH = (width - TIME_COL_WIDTH) / 7;
-const HOUR_HEIGHT = 60;
+// Make the month-day item match the column width so the day labels align
+const DAY_ITEM_WIDTH = DAY_COL_WIDTH;
+const HOUR_HEIGHT = 100;
+const HEADER_HEIGHT = 40;
 
 // Simple Appointments screen implementing the requirements from docs/reminder-redesign.md (section 5)
 export default function Appointments() {
@@ -57,21 +59,6 @@ export default function Appointments() {
       }, 100);
     }
   }, []);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 20;
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dx > 50) {
-          changeWeek(-1);
-        } else if (gestureState.dx < -50) {
-          changeWeek(1);
-        }
-      },
-    })
-  ).current;
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -267,7 +254,7 @@ export default function Appointments() {
           <View style={{ width: 40 }} />
         </View>
 
-        <View style={styles.content} {...panResponder.panHandlers}>
+        <View style={styles.content}>
           <View style={styles.monthNavigation}>
             <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.navButton}>
               <Ionicons name="chevron-back" size={24} color="#333" />
@@ -311,6 +298,7 @@ export default function Appointments() {
             <View style={styles.gridContainer}>
               {/* Time Column */}
               <View style={styles.timeColumn}>
+                <View style={{ height: HEADER_HEIGHT }} />
                 {hours.map((hour) => (
                   <View key={hour} style={styles.timeLabelContainer}>
                     <Text style={styles.timeLabel}>
@@ -321,29 +309,36 @@ export default function Appointments() {
               </View>
 
               {/* Days Columns */}
-              {weekDays.map((day, dayIndex) => (
-                <View key={dayIndex} style={styles.dayColumn}>
-                  {/* Grid Lines */}
-                  {hours.map((hour) => (
-                    <View key={hour} style={styles.gridCell} />
-                  ))}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+                {weekDays.map((day, dayIndex) => (
+                  <View key={dayIndex} style={styles.dayColumn}>
+                    {/* Header space removed (weekday labels duplicated above). Keep spacing for alignment */}
+                    <View style={{ height: HEADER_HEIGHT }} />
 
-                  {/* Events */}
-                  {renderEventsForDay(day)}
+                    <View style={{ position: 'relative' }}>
+                      {/* Grid Lines */}
+                      {hours.map((hour) => (
+                        <View key={hour} style={styles.gridCell} />
+                      ))}
 
-                  {/* Current Time Indicator (if today) */}
-                  {isToday(day) && (
-                    <View 
-                      style={[
-                        styles.currentTimeLine, 
-                        { top: (new Date().getHours() * HOUR_HEIGHT) + ((new Date().getMinutes() / 60) * HOUR_HEIGHT) }
-                      ]} 
-                    >
-                      <View style={styles.currentTimeDot} />
+                      {/* Events */}
+                      {renderEventsForDay(day)}
+
+                      {/* Current Time Indicator (if today) */}
+                      {isToday(day) && (
+                        <View
+                          style={[
+                            styles.currentTimeLine,
+                            { top: (new Date().getHours() * HOUR_HEIGHT) + ((new Date().getMinutes() / 60) * HOUR_HEIGHT) }
+                          ]}
+                        >
+                          <View style={styles.currentTimeDot} />
+                        </View>
+                      )}
                     </View>
-                  )}
-                </View>
-              ))}
+                  </View>
+                ))}
+              </ScrollView>
             </View>
           </ScrollView>
 
@@ -461,14 +456,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   monthDaysScroll: {
-    paddingHorizontal: 8,
+    // left padding matches the time column width to align month strip items with the day columns below
+    paddingLeft: TIME_COL_WIDTH,
+    paddingRight: 8,
     paddingVertical: 10,
     alignItems: 'center',
   },
   dayItem: {
     width: DAY_ITEM_WIDTH,
     alignItems: 'center',
-    marginHorizontal: 6,
+    marginHorizontal: 0,
   },
   dayItemSelected: {
     // subtle background for selected day
@@ -516,15 +513,15 @@ const styles = StyleSheet.create({
   },
   eventCard: {
     position: 'absolute',
-    left: 1,
-    right: 1,
-    borderRadius: 4,
-    padding: 2,
+    left: 2,
+    right: 2,
+    borderRadius: 6,
+    padding: 4,
     overflow: 'hidden',
   },
   eventTitle: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
   currentTimeLine: {
@@ -549,5 +546,37 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  columnHeader: {
+    height: HEADER_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#f9fafb',
+  },
+  columnHeaderDay: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  columnHeaderDateBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todayBadge: {
+    backgroundColor: '#10b981',
+  },
+  columnHeaderDate: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  todayDateText: {
+    color: '#fff',
   },
 });
