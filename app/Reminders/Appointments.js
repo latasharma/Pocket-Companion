@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: '#ea4335',
+    backgroundColor: '#000000',
     zIndex: 10,
   },
   currentTimeDot: {
@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ea4335',
+    backgroundColor: '#000000',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
