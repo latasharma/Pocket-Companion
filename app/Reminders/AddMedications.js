@@ -18,10 +18,63 @@ export default function AddMedicationsScreen() {
 
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
 
-  const [name, setName] = useState(params.name || '');
-  const [dosage, setDosage] = useState(params.dosage || '');
+  // Robust parsing of incoming OCR/navigation params so we can prefill fields
+  const tryParseJSON = (val) => {
+    if (!val) return null;
+    if (typeof val === 'object') return val;
+    if (typeof val !== 'string') return null;
+    try {
+      // Some callers pass a stringified JSON inside the `name` param
+      return JSON.parse(val);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // Look for structured OCR payload in multiple possible param keys
+  const parsedOCR = (() => {
+    const keysToCheck = ['ocrResult', 'ocr', 'ocrJson', 'ocrText', 'name'];
+    for (const k of keysToCheck) {
+      if (!params[k]) continue;
+      const parsed = tryParseJSON(params[k]);
+      // If parsed is an object and contains expected OCR keys, return it
+      if (parsed && (parsed.medicine_name || parsed.raw_text || parsed.dosage || parsed.name || parsed.instructions)) {
+        return parsed;
+      }
+      // If the param itself is a plain string (not JSON) and we are checking 'name', we skip here
+    }
+    return null;
+  })();
+  
+  // Normalize OCR text: remove extra newlines and escaped "\\n" sequences so it displays nicely on a single line
+  const cleanOCRText = (val) => {
+    if (!val) return '';
+    if (typeof val !== 'string') {
+      try { return String(val); } catch { return ''; }
+    }
+    // Convert escaped backslash-n sequences to real newlines, normalize CRLF to LF
+    let s = val.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
+    // Split on newlines, trim each line, drop empty lines and join with a single space
+    s = s.split('\n').map(line => line.trim()).filter(Boolean).join(' ');
+    // Collapse multiple whitespace into single space
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+  };
+  
+  // Derive initial values: prefer structured OCR, otherwise use raw params
+  const initialName = parsedOCR?.medicine_name || parsedOCR?.name || (typeof params.name === 'string' && !params.name.trim().startsWith('{') ? params.name : '') || '';
+  const initialDosage = parsedOCR?.dosage || parsedOCR?.strength || '' || params.dosage || '';
+  const initialNotes = cleanOCRText(parsedOCR?.raw_text) || cleanOCRText(parsedOCR?.instructions) || params.notes || '';
+
+  const [name, setName] = useState(initialName);
+  const [dosage, setDosage] = useState(initialDosage);
   const [time, setTime] = useState(params.time || '');
-  const [notes, setNotes] = useState(params.notes || '');
+  const [notes, setNotes] = useState(initialNotes);
+
+  // Track whether fields were auto-populated by OCR so UI can subtly highlight them
+  const [isNamePrefilled, setIsNamePrefilled] = useState(!!initialName);
+  const [isDosagePrefilled, setIsDosagePrefilled] = useState(!!initialDosage);
+
   const [verification, setVerification] = useState(() => {
     if (params.verification) {
       try {
@@ -32,6 +85,7 @@ export default function AddMedicationsScreen() {
     }
     return { nameChecked: false, dosageChecked: false, instructionsChecked: false };
   });
+
   const [saving, setSaving] = useState(false);
 
   const timeOptions = [
@@ -105,19 +159,19 @@ export default function AddMedicationsScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {/* Reference image - exact UI reference per design doc */}
-          {/* <Image source={require('../../docs/Add_Medication_Manual.jpeg')} style={styles.referenceImage} /> */}
-
           <ThemedText type="subtitle" style={[styles.sectionTitle, { fontFamily: uiFontFamily, color: textColor }]}>Medicine Details</ThemedText>
 
           <View style={styles.field}>
             <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily }]}>Medicine name</ThemedText>
             <TextInput
               value={name}
-              onChangeText={setName}
+              onChangeText={(v) => { setName(v); if (isNamePrefilled) setIsNamePrefilled(false); }}
               placeholder="e.g. Paracetamol"
               placeholderTextColor="#9ca3af"
-              style={[styles.input, { fontFamily: uiFontFamily, color: textColor, borderColor: '#e5e7eb' }]}
+              style={[
+                styles.input,
+                { fontFamily: uiFontFamily, color: textColor, borderColor: '#e5e7eb' }
+              ]}
               accessibilityLabel="Medicine name"
             />
           </View>
@@ -126,10 +180,13 @@ export default function AddMedicationsScreen() {
             <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily }]}>Dosage</ThemedText>
             <TextInput
               value={dosage}
-              onChangeText={setDosage}
+              onChangeText={(v) => { setDosage(v); if (isDosagePrefilled) setIsDosagePrefilled(false); }}
               placeholder="e.g. 1 tablet, 500 mg"
               placeholderTextColor="#9ca3af"
-              style={[styles.input, { fontFamily: uiFontFamily, color: textColor, borderColor: '#e5e7eb' }]}
+              style={[
+                styles.input,
+                { fontFamily: uiFontFamily, color: textColor, borderColor: '#e5e7eb' }
+              ]}
               accessibilityLabel="Dosage"
             />
           </View>
@@ -284,4 +341,5 @@ const styles = StyleSheet.create({
   footer: { padding: 20, borderTopWidth: 0 },
   saveButton: { padding: 16, borderRadius: 12, alignItems: 'center' },
   saveText: { fontSize: 18 },
+
 });

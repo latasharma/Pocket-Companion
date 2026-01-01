@@ -2,11 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { parseMedicationFromOCR, performGeminiVisionOCRFromUrl } from '@/lib/aiService';
 import { supabase } from '@/lib/supabase';
 import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 
@@ -15,6 +17,8 @@ export default function MedicationsScreen() {
   const [photo, setPhoto] = useState(null);
   const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Theme-aware colors
   const background = useThemeColor({}, 'background')
@@ -72,22 +76,155 @@ export default function MedicationsScreen() {
   const handleBack = () => router.back();
 
   const handleScan = async () => {
+    setScanning(true);
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (permission.granted === false) {
         Alert.alert('Permission required', 'Camera permission is required to scan a medicine');
+        setScanning(false);
         return;
       }
-      const result = await ImagePicker.launchCameraAsync({ quality: 0.7, base64: false });
+
+      // Capture image from camera — prefer not to request base64 to keep payload small.
+      // We will upload the captured file and send the generated Supabase image URL to Gemini Vision OCR.
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.3,
+        exif: false,
+        allowsEditing: false,
+        base64: true
+      });
+
       // Handle both older (cancelled) and newer (canceled) keys
       const cancelled = result.cancelled === undefined ? result.canceled : result.cancelled;
-      if (!cancelled) {
-        // result.uri for older SDKs, result.assets[0].uri for newer
-        const uri = result.uri ?? (result.assets && result.assets[0] && result.assets[0].uri);
-        if (uri) setPhoto(uri);
+      if (cancelled) {
+        setScanning(false);
+        return;
       }
+
+      const uri = result.uri ?? (result.assets && result.assets[0] && result.assets[0].uri);
+      // base64 will be undefined unless the picker returned it; prefer URL-based OCR.
+      const base64Image = result.base64 ?? (result.assets && result.assets[0] && result.assets[0].base64);
+
+      if (uri) setPhoto(uri);
+
+      // Upload captured image to Supabase Storage (medicine-ocr-images bucket)
+      let uploadedPublicUrl = null;
+      try {
+        const filename = `ocr_${Date.now()}.jpg`;
+        const filePath = `uploads/${filename}`; // put uploads in a dedicated folder
+
+        // Fetch the captured file as an ArrayBuffer
+        const fetchRes = await fetch(uri);
+        const arrayBuffer = await fetchRes.arrayBuffer();
+
+        // Upload to the specified bucket and path. Use upsert: false to avoid overwriting.
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('medicine-ocr-images')
+          .upload(filePath, arrayBuffer, { contentType: 'image/jpeg', upsert: false });
+
+        if (uploadError) {
+          console.error('Supabase upload error:', uploadError);
+        } else {
+          const path = uploadData?.path || filePath;
+
+          // Try to generate a public URL first (works if bucket is public)
+          try {
+            const { data: urlData, error: urlError } = await supabase.storage
+              .from('medicine-ocr-images')
+              .getPublicUrl(path);
+
+            if (urlError) {
+              console.error('Supabase getPublicUrl error:', urlError);
+            } else {
+              uploadedPublicUrl = urlData?.publicUrl || urlData?.publicURL || urlData?.public_url || null;
+            }
+          } catch (e) {
+            console.error('Error generating public URL:', e);
+          }
+
+          // If the bucket is private or public URL not available, create a signed URL (valid for 1 hour)
+          if (!uploadedPublicUrl) {
+            try {
+              const expiresIn = 60 * 60; // 1 hour
+              const { data: signedData, error: signedError } = await supabase.storage
+                .from('medicine-ocr-images')
+                .createSignedUrl(path, expiresIn);
+
+              if (signedError) {
+                console.error('Supabase createSignedUrl error:', signedError);
+              } else {
+                // Signed URL property name can vary between SDK versions
+                uploadedPublicUrl = signedData?.signedUrl || signedData?.signed_url || null;
+              }
+            } catch (e) {
+              console.error('Error creating signed URL:', e);
+            }
+          }
+
+          console.log('Uploaded image URL (public or signed):', uploadedPublicUrl);
+        }
+      } catch (uploadErr) {
+        console.error('Upload error:', uploadErr);
+      }
+
+      // Prefer sending an accessible image URL to Gemini Vision (per docs). Fall back to base64 if URL OCR fails.
+      let ocrRaw = null;
+      if (uploadedPublicUrl && typeof performGeminiVisionOCRFromUrl === 'function') {
+        try {
+          ocrRaw = await performGeminiVisionOCRFromUrl(uploadedPublicUrl);
+          console.log('OCR (from URL) raw output:', ocrRaw);
+        } catch (err) {
+          console.error('OCR from URL failed:', err);
+          ocrRaw = null;
+        }
+      }
+
+      // if (!ocrRaw && base64Image) {
+      //   try {
+      //     ocrRaw = await performGeminiVisionOCR(base64Image);
+      //     console.log('OCR (from base64) raw output:', ocrRaw);
+      //   } catch (ocrErr) {
+      //     console.error('OCR error:', ocrErr);
+      //   }
+      // }
+
+      if (ocrRaw) {
+        const ocrText = typeof ocrRaw === 'string' ? ocrRaw : JSON.stringify(ocrRaw);
+
+        try {
+          const parsed = parseMedicationFromOCR(ocrText);
+          console.log('OCR parsed result:', parsed);
+
+          const confidence = parsed && typeof parsed.confidence === 'number' ? parsed.confidence : 0;
+
+          // If confidence is sufficient, pre-fill the Add Medication form. Otherwise fallback to manual entry.
+          if (confidence >= 50 && (parsed.name || parsed.dosage)) {
+            setScanning(false);
+            router.push({
+              pathname: '/Reminders/AddMedications',
+              params: {
+                name: parsed.name || undefined,
+                dosage: parsed.dosage || undefined,
+                ocrText: ocrText || undefined,
+                imageUrl: uploadedPublicUrl || undefined,
+              },
+            });
+            return;
+          } else {
+            console.log('OCR confidence low or insufficient data (confidence=' + confidence + '), navigating without prefill');
+          }
+        } catch (parseErr) {
+          console.error('OCR parse error:', parseErr);
+        }
+      }
+
+      // Fallback: navigate without prefilled data
+      setScanning(false);
+      router.push('/Reminders/AddMedications');
     } catch (err) {
       console.error('Camera error:', err);
+      setScanning(false);
+      Alert.alert('Error', 'Failed to scan image.');
     }
   };
 
@@ -206,14 +343,6 @@ export default function MedicationsScreen() {
           <View style={styles.addedSection}>
             <ThemedText type="subtitle" style={[styles.sectionTitle, { fontFamily: uiFontFamily, color: textColor }]}>Added Medications</ThemedText>
 
-            {photo ? (
-              <View style={styles.photoPreview}>
-                <Image source={{ uri: photo }} style={styles.photo} />
-                <TouchableOpacity style={styles.removePhotoButton} onPress={removePhoto} accessibilityLabel="Remove photo">
-                  <Ionicons name="close" size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ) : null}
 
             {loading ? (
               <ThemedText style={[styles.placeholderText, { fontFamily: uiFontFamily }]}>Loading...</ThemedText>
@@ -237,12 +366,18 @@ export default function MedicationsScreen() {
           <TouchableOpacity style={[styles.footerButton, styles.footerPrimary]} onPress={handleContinue} accessibilityLabel="Continue">
             <ThemedText type="defaultSemiBold" style={[styles.footerButtonText]}>Continue</ThemedText>
           </TouchableOpacity>
-
+    
           <TouchableOpacity style={[styles.footerButton, styles.footerSecondary]} onPress={handleAddLater} accessibilityLabel="Add later">
             <ThemedText type="defaultSemiBold" style={[styles.footerButtonText, styles.footerSecondaryText]}>Add Later</ThemedText>
           </TouchableOpacity>
         </View>
-
+    
+        {scanning && (
+          <View style={[styles.loadingOverlay, { top: -insets.top, bottom: -insets.bottom }]} pointerEvents="auto">
+            <ActivityIndicator size="large" color="#10b981" />
+          </View>
+        )}
+    
       </ThemedView>
     </SafeAreaView>
   );
@@ -253,7 +388,7 @@ const styles = StyleSheet.create({
   appBar: { height: 56, flexDirection: 'row', alignItems: 'center' },
   backButton: { padding: 8 },
   appBarRight: { width: 32 },
-  title: { 
+  title: {
     fontSize: 20,
     fontWeight: '600',
     color: '#111827',
@@ -275,14 +410,14 @@ const styles = StyleSheet.create({
   placeholderTitle: { fontSize: 18, fontWeight: '600', color: '#6b7280', marginBottom: 6 },
   placeholderSubtitle: { fontSize: 14, color: '#9ca3af' },
   placeholderText: { color: '#6b7280' },
-  medItem: { 
-    backgroundColor: '#fafafa', 
-    borderRadius: 12, 
-    padding: 12, 
-    marginBottom: 10, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center' 
+  medItem: {
+    backgroundColor: '#fafafa',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
   },
   medInfo: { flex: 1 },
   medActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -292,7 +427,15 @@ const styles = StyleSheet.create({
   photoPreview: { marginBottom: 12, alignSelf: 'stretch' },
   photo: { width: '100%', height: 200, borderRadius: 10 },
   removePhotoButton: { position: 'absolute', top: 8, right: 8, backgroundColor: '#ef4444', borderRadius: 16, padding: 6 },
- 
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 20,
+  },
+  
   /* Footer column styles */
   footerColumn: {
     position: 'absolute',
