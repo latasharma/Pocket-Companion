@@ -137,8 +137,8 @@ export default function AddMedicationsScreen() {
         return;
       }
 
-      // Navigate back to the medications list and let it refresh
-      router.push('/Reminders/Medications');
+      // Navigate back to the medications list
+      router.dismiss();
     } catch (err) {
       console.error('Save error:', err);
       Alert.alert('Error', 'An unexpected error occurred while saving.');

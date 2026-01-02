@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,10 +27,12 @@ export default function MedicationsScreen() {
   // Prefer a humanist sans-serif if available; fallback to system font.
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
 
-  useEffect(() => {
-    requestNotificationPermission();
-    fetchMedications();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      requestNotificationPermission();
+      fetchMedications();
+    }, [])
+  );
 
   useEffect(() => {
     medications.forEach((med) => {
@@ -353,7 +355,10 @@ export default function MedicationsScreen() {
                 renderItem={renderMedItem}
                 ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
                 ListEmptyComponent={renderEmpty}
-                contentContainerStyle={medications.length === 0 ? { flex: 1 } : { paddingBottom: 8 }}
+                contentContainerStyle={{
+                  paddingBottom: 20,
+                  flexGrow: medications.length === 0 ? 1 : undefined,
+                }}
                 showsVerticalScrollIndicator={false}
               />
             )}
@@ -362,7 +367,7 @@ export default function MedicationsScreen() {
         </View>
 
         {/* Footer column with two stacked buttons */}
-        <View style={[styles.footerColumn, { backgroundColor: 'transparent' }]}>
+        <View style={styles.footerColumn}>
           <TouchableOpacity style={[styles.footerButton, styles.footerPrimary]} onPress={handleContinue} accessibilityLabel="Continue">
             <ThemedText type="defaultSemiBold" style={[styles.footerButtonText]}>Continue</ThemedText>
           </TouchableOpacity>
@@ -371,6 +376,7 @@ export default function MedicationsScreen() {
             <ThemedText type="defaultSemiBold" style={[styles.footerButtonText, styles.footerSecondaryText]}>Add Later</ThemedText>
           </TouchableOpacity>
         </View>
+
     
         {scanning && (
           <View style={[styles.loadingOverlay, { top: -insets.top, bottom: -insets.bottom }]} pointerEvents="auto">
@@ -395,7 +401,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  content: { flex: 1, marginTop: 12, paddingBottom: 160 },
+  content: { flex: 1, marginTop: 12 },
   headerTitleText: { fontSize: 22, fontWeight: '700', marginBottom: 6, textAlign: 'left' },
   // increased spacing below header description to visually separate it from action buttons
   descriptionText: { fontSize: 16, color: '#6b7280', marginBottom: 16 },
@@ -404,7 +410,7 @@ const styles = StyleSheet.create({
   actionButton: { flex: 1, padding: 14, borderRadius: 10, marginHorizontal: 8, alignItems: 'center' },
   actionText: { color: '#fff', fontWeight: '600' },
   // add more top margin so the "Added Medications" section sits comfortably below the action row
-  addedSection: { marginTop: 20, marginBottom: 12 },
+  addedSection: { marginTop: 20, marginBottom: 12, flex: 1 },
   sectionTitle: { marginBottom: 10 },
   placeholderBox: { backgroundColor: '#fff', borderRadius: 12, padding: 18, alignItems: 'center' },
   placeholderTitle: { fontSize: 18, fontWeight: '600', color: '#6b7280', marginBottom: 6 },
@@ -438,12 +444,9 @@ const styles = StyleSheet.create({
   
   /* Footer column styles */
   footerColumn: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 20,
     flexDirection: 'column',
     alignItems: 'stretch',
+    marginBottom: 20,
   },
   footerButton: {
     padding: 14,
