@@ -1,0 +1,342 @@
+# Reminder Feature – React Native Screens (With OCR Integration)
+
+## Document Purpose
+You are enhancing an existing React Native mobile application called **Pocket Companion**, designed mainly for elderly users. The goal is to introduce a new **Reminder feature** while keeping the app’s current design, theme, and navigation fully consistent.
+
+This document now also includes **OCR-based medication scanning using Gemini API**.
+
+---
+
+## Table of Contents
+1. Startup Screen
+2. Reminder Options Screen
+3. Medications Screen (with OCR)
+4. Add Medications Screen (OCR Auto-fill)
+5. Appointments Screen
+6. Important Dates Screen (with Repeat Functionality)
+
+---
+
+## 1. Startup Screen
+
+### 1.1 Overview Page Layout
+
+**Page Route**: `/app/index.js`
+
+**Page Structure**:
+```
+Header Section
+1. Keep the existing header and overall layout unchanged.
+
+Main Content
+1. Add a new option named “Reminder” in the main content area.
+2. Position the Reminder option between the two existing options already displayed.
+3. Ensure the Reminder option matches the exact design, size, style, and behavior of the other options.
+```
+
+---
+
+## 2. Reminder Options Screen
+
+### 2.1 Overview Page Layout
+
+**Page Route**: `/Reminders/ShowReminderOptionsScreen.js`
+
+**Page Structure**:
+```
+Header Section
+1. Page Title: "Reminder" (English)
+2. A back button in the app bar, styled according to the current app theme.
+3. Use the same background color and theme used throughout the app.
+4. To design the header section take reference from this file `/app/chat.js`.
+
+Main Content 
+1. Show three large, easy-to-tap, icon-based buttons (quick chips):
+   * Medication (💊 icon)
+   * Appointments (User–Doctor style icon)
+   * Important Dates (🎂 icon)
+```
+
+---
+
+## 3. Medications Screen (With OCR Scanning)
+
+### 3.1 Overview Page Layout
+
+**Page Route**: `/Reminders/Medications.js`
+
+**Page Structure**:
+```
+Header Section
+1. Page title should be “Reminder”.
+2. Include a themed back button in the app bar.
+3. Use the same background and overall styling as other screens in the app.
+4. To design the header section take reference from this file `/app/chat.js`.
+
+Main content
+1. Remove the image which is added in top section. In place of the image add a title text "Add your medications or supplements" in big bold fonts for elderly readability.
+2. Add description text "You can scan bottles or add them manually. This helps us personalize your experience.".
+3. Match the layout, spacing, font sizes, and structure shown in the reference image.
+4. Apply the app’s existing theme (backgrounds, buttons, typography).
+5. Use a humanist sans-serif font suitable for elderly users (e.g., Atkinson Hyperlegible).
+6. Display two action buttons at the bottom:
+   * Scan (OCR flow)
+   * Manual (manual entry)
+7. Include an Added Medications section with placeholder UI if empty.
+```
+
+---
+
+## 4. Add Medications Screen (OCR Auto-fill)
+
+### 4.1 Overview Page Layout
+
+**Page Route**: `/Reminders/AddMedications.js`
+
+**Page Structure**:
+```
+Header Section
+1. Page Title: "Add Reminder" (English)
+2. Include a themed back button.
+3. Maintain consistent background and styling.
+
+Main Content
+1. Use `/docs/Add_Medication_Manual.jpeg` as the UI reference.
+2. Match layout, spacing, fonts, and structure exactly.
+3. Apply existing app theme.
+4. Use elderly-friendly typography.
+5. Add Verification Checklist above "Save Medicine" button.
+6. Include a single primary action button at the bottom.
+7. On “Save Medicine”, store data in Supabase `medications` table.
+```
+
+---
+
+## 5. Appointments Screen
+
+### 5.1 Overview Page Layout
+
+**Page Route**: `/Reminders/Appointments.js`
+
+**Page Structure**:
+```
+Header Section
+1. Page Title: "Appointments" (English)
+2. Include a themed back button.
+3. Maintain consistent styling.
+
+Main Content
+1. Two action buttons:
+   * Access Calendar / Email
+   * Manual entry
+2. Save appointments to Supabase.
+3. Show Added Appointments section with placeholder if empty.
+```
+
+---
+
+## 6. Important Dates Screen (With Repeat Functionality)
+
+### 6.1 Overview Page Layout
+
+**Page Route**: `/Reminders/ImportantDates.js`
+
+**Page Structure**:
+```
+Header Section
+1. Page Title: "Important Dates" (English)
+2. Include themed back button.
+3. Maintain consistent styling.
+
+Main Content
+1. Two action buttons:
+   * Add Voice (voice input for title & date)
+   * Manual (manual entry)
+2. Save data to Supabase `important_dates` table.
+3. Show Added Important Dates section with placeholder if empty.
+```
+
+---
+
+### 6.2 Repeat Reminder Functionality (Elderly-Friendly)
+
+The Repeat Reminder feature allows recurring reminders for birthdays, anniversaries, and other repeating events while remaining **simple, predictable, and stress-free** for elderly users.
+
+---
+
+### 6.3 UX & Accessibility Principles (Mandatory)
+
+1. Minimal choices only (no custom rules)
+2. Plain language labels
+3. Large touch targets
+4. Default: **Do not repeat**
+
+---
+
+### 6.4 Database Changes (Supabase)
+
+```sql
+alter table important_dates
+add column repeat_type text default 'none';
+```
+
+Allowed values: `none`, `daily`, `weekly`, `monthly`, `yearly`
+
+---
+
+### 6.5 UI – Repeat Section
+
+Add a **Repeat** section below **Remind me** with options:
+- Do not repeat
+- Every day
+- Every week
+- Every month
+- Every year
+
+Use the same grid-style selectable cards.
+
+---
+
+### 6.6 Voice Input Mapping
+
+| Spoken Phrase | Value |
+|--------------|-------|
+| Every year | yearly |
+| Every month | monthly |
+| Every week | weekly |
+| Every day | daily |
+| Do not repeat | none |
+
+---
+
+### 6.7 Saving Repeat Data
+
+Include `repeat_type` in the save payload.
+
+---
+
+### 6.8 Notification Scheduling Rules
+
+1. Non-repeating → existing logic
+2. Repeating → schedule **next occurrence only**
+3. After notification fires → schedule next
+4. Re-evaluate on app foreground
+
+---
+
+### 6.9 Repeat Interval Rules
+
+| Type | Rule |
+|-----|------|
+| Daily | +1 day |
+| Weekly | +7 days |
+| Monthly | Same date next month |
+| Yearly | Same date next year |
+
+---
+
+### 6.10 Display in List
+
+Show below date:
+- “Repeats every year”
+- “Repeats every month”
+
+---
+
+### 6.11 What NOT to Implement
+
+- Custom intervals
+- End dates
+- Technical terminology
+- Bulk scheduling
+
+---
+
+## 7. Custom Notification Sound Integration (Using Notifee)
+
+### 7.1 Purpose
+
+Custom notification sounds help elderly users clearly recognize reminders even in noisy environments. The sound must be **soft, clear, slow, and non-startling**, with a gentle chime or bell-like tone.
+
+Recommended sound characteristics:
+
+* Low to mid frequency (not sharp)
+* Short duration (1–2 seconds)
+* Calm bell / water-drop / soft chime
+* Avoid alarms or sirens
+
+---
+
+### 7.2 Sound Asset Preparation
+
+#### Android
+
+1. Create a folder:
+   android/app/src/main/res/raw
+2. Add the sound file:
+   reminder_tone.mp3
+3. Naming rules:
+
+   * Lowercase only
+   * No spaces or special characters
+
+#### iOS
+
+1. Open the iOS project in Xcode
+2. Add the sound file:
+   reminder_tone.wav
+3. Ensure:
+
+   * File is added to **Copy Bundle Resources**
+   * Duration ≤ 30 seconds
+   * Format: .wav or .caf preferred
+
+---
+
+### 7.3 Notifee Channel Configuration (Android – Mandatory)
+
+```js
+import notifee, { AndroidImportance } from '@notifee/react-native';
+
+async function createReminderChannel() {
+  await notifee.createChannel({
+    id: 'elderly-reminders',
+    name: 'Reminder Alerts',
+    sound: 'reminder_chime',
+    importance: AndroidImportance.HIGH,
+    vibration: true,
+  });
+}
+```
+
+Call once on app launch.
+
+---
+
+### 7.4 Display Notification with Custom Sound
+
+```js
+await notifee.displayNotification({
+  title: 'Medication Reminder',
+  body: 'Please take your blood pressure medicine',
+  android: {
+    channelId: 'elderly-reminders',
+    sound: 'reminder_chime',
+  },
+  ios: {
+    sound: 'reminder_chime.wav',
+  },
+});
+```
+
+---
+
+### 7.5 Elderly Accessibility Rules
+
+1. No alarm-like sounds
+2. Gentle vibration only
+3. Single default sound
+4. System volume respected
+5. Clear readable notification text
+
+---

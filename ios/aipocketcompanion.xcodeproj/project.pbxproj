@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0B5EDA012F0788EE0001C0BD /* reminder_tone.wav in Resources */ = {isa = PBXBuildFile; fileRef = 0B5EDA002F0788EE0001C0BD /* reminder_tone.wav */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		1F23A0452FCE11B86C8B8BB8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 68C89B60AF4292EE416306D0 /* PrivacyInfo.xcprivacy */; };
 		3B93E1F01A74FDCBDE52944F /* libPods-aipocketcompanion.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F59EFC9D8F2DD6F7CAD24204 /* libPods-aipocketcompanion.a */; };
@@ -17,6 +18,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0B5EDA002F0788EE0001C0BD /* reminder_tone.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = reminder_tone.wav; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* aipocketcompanion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = aipocketcompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = aipocketcompanion/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = aipocketcompanion/Info.plist; sourceTree = "<group>"; };
@@ -44,6 +46,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0B5ED9FF2F0788830001C0BD /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				0B5EDA002F0788EE0001C0BD /* reminder_tone.wav */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* aipocketcompanion */ = {
 			isa = PBXGroup;
 			children = (
@@ -94,6 +104,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				0B5ED9FF2F0788830001C0BD /* Resources */,
 				13B07FAE1A68108700A75B9A /* aipocketcompanion */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -196,6 +207,7 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				1F23A0452FCE11B86C8B8BB8 /* PrivacyInfo.xcprivacy in Resources */,
+				0B5EDA012F0788EE0001C0BD /* reminder_tone.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

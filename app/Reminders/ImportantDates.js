@@ -22,6 +22,7 @@ export default function ImportantDatesScreen() {
   const [saving, setSaving] = useState(false);
   const [reminderType, setReminderType] = useState('24_hours');
   const [pickerDate, setPickerDate] = useState(new Date());
+  const [repeatType, setRepeatType] = useState('none');
 
   const [importantDates, setImportantDates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,14 @@ export default function ImportantDatesScreen() {
     { id: 'all', label: 'All of the above', icon: 'notifications' },
   ];
 
+  const repeatOptions = [
+    { id: 'none', label: 'Do not repeat' },
+    { id: 'daily', label: 'Every day' },
+    { id: 'weekly', label: 'Every week' },
+    { id: 'monthly', label: 'Every month' },
+    { id: 'yearly', label: 'Every year' },
+  ];
+
   useEffect(() => {
     initializeNotificationService();
     fetchImportantDates();
@@ -56,7 +65,7 @@ export default function ImportantDatesScreen() {
       if (!item.date) return;
       
       const eventDate = new Date(item.date);
-      
+
       // Check if date is valid
       if (isNaN(eventDate.getTime())) {
         console.warn(`Invalid date for item ${item.id}: ${item.date}`);
@@ -72,7 +81,40 @@ export default function ImportantDatesScreen() {
       }
 
       const type = item.reminder_type || '24_hours';
+      const repeat = item.repeat_type || 'none';
       const now = new Date();
+
+      // If repeating, compute the next occurrence date (>= now)
+      const computeNextOccurrence = (baseDate, repeatVal) => {
+        if (!repeatVal || repeatVal === 'none') return new Date(baseDate.getTime());
+        let d = new Date(baseDate.getTime());
+        // Advance until the occurrence is in the future
+        let safety = 0;
+        while (d <= now && safety < 1000) {
+          if (repeatVal === 'daily') {
+            d.setDate(d.getDate() + 1);
+          } else if (repeatVal === 'weekly') {
+            d.setDate(d.getDate() + 7);
+          } else if (repeatVal === 'monthly') {
+            // Preserve day-of-month as best as possible
+            const day = d.getDate();
+            const nextMonth = d.getMonth() + 1;
+            const year = d.getFullYear() + Math.floor(nextMonth / 12);
+            const month = nextMonth % 12;
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            d.setMonth(d.getMonth() + 1);
+            d.setDate(Math.min(day, lastDay));
+          } else if (repeatVal === 'yearly') {
+            d.setFullYear(d.getFullYear() + 1);
+          } else {
+            break;
+          }
+          safety += 1;
+        }
+        return d;
+      };
+
+      const baseEventDate = (repeat && repeat !== 'none') ? computeNextOccurrence(eventDate, repeat) : eventDate;
 
       // Define time offsets
       const offsets = {
@@ -89,7 +131,7 @@ export default function ImportantDatesScreen() {
       };
 
       const schedule = (reminderKey, offsetMs) => {
-        const triggerDate = new Date(eventDate.getTime() - offsetMs);
+        const triggerDate = new Date(baseEventDate.getTime() - offsetMs);
         const notificationId = `important-date-${item.id}-${reminderKey}`;
         
         // Only schedule if the trigger date is in the future
@@ -109,6 +151,7 @@ export default function ImportantDatesScreen() {
               dateTitle: item.title,
               originalDate: item.date,
               reminderType: reminderKey,
+              repeatType: repeat,
             },
           });
         } else {
@@ -182,10 +225,33 @@ export default function ImportantDatesScreen() {
       setRecordingField(field);
       setIsRecording(true);
 
+      // Map spoken phrases to repeat_type values (see docs/reminder_feature.md 6.6)
+      const mapRepeatTypeFromSpeech = (speechText) => {
+        if (!speechText) return null;
+        const t = speechText.toLowerCase();
+        // Exact phrase matches and common variants
+        if (t.includes("every year") || t.includes('yearly')) return 'yearly';
+        if (t.includes("every month") || t.includes('monthly')) return 'monthly';
+        if (t.includes("every week") || t.includes('weekly')) return 'weekly';
+        if (t.includes("every day") || t.includes('daily') || t.includes('everyday')) return 'daily';
+        if (t.includes("do not repeat") || t.includes("don't repeat") || t.includes('no repeat') || t.includes('never repeat')) return 'none';
+        return null;
+      };
+
       // onResult will be called after stopRecording when transcription completes
       await VoiceInputService.startRecording(
         (text) => {
-          const cleanedText = text.replace(/[.,?!;:]+$/, '');
+          let cleanedText = text.replace(/[.,?!;:]+$/, '').trim();
+
+          // Detect and extract repeat instructions embedded in speech (e.g. "Mom's birthday every year")
+          const detectedRepeat = mapRepeatTypeFromSpeech(cleanedText);
+          if (detectedRepeat) {
+            console.log('Voice mapped repeat type:', detectedRepeat);
+            setRepeatType(detectedRepeat);
+            // Remove the repeat phrase(s) from the cleaned text so the title/date remains clean
+            cleanedText = cleanedText.replace(/\bevery year\b|\bevery month\b|\bevery week\b|\bevery day\b|\byearly\b|\bmonthly\b|\bweekly\b|\bdaily\b|\bdo not repeat\b|\bdon't repeat\b|\bno repeat\b|\bnever repeat\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+          }
+
           if (field === 'title') setTitle((t) => (t ? t + ' ' + cleanedText : cleanedText));
           else if (field === 'date') setDate((d) => (d ? d + ' ' + cleanedText : cleanedText));
 
@@ -272,6 +338,7 @@ export default function ImportantDatesScreen() {
     }
 
     setReminderType(item.reminder_type || '24_hours');
+    setRepeatType(item.repeat_type || 'none');
     setEditingId(item.id);
     setShowManualDialog(true);
     setShowVoiceForm(false);
@@ -400,6 +467,7 @@ export default function ImportantDatesScreen() {
         date: formattedDate, // Always in MM/DD/YYYY format
         reminder_type: reminderType,
         time: '08:00:00',
+        repeat_type: repeatType,
       };
 
       console.log('Saving important date:', payload);
@@ -436,6 +504,7 @@ export default function ImportantDatesScreen() {
       setTitle('');
       setDate('');
       setReminderType('24_hours');
+      setRepeatType('none');
       setEditingId(null);
       setShowManualForm(false);
       setShowVoiceForm(false);
@@ -487,11 +556,21 @@ export default function ImportantDatesScreen() {
       return d;
     };
 
+    const repeatTextMap = {
+      daily: 'Repeats every day',
+      weekly: 'Repeats every week',
+      monthly: 'Repeats every month',
+      yearly: 'Repeats every year',
+    };
+
     return (
       <View style={styles.itemCard}>
         <View style={styles.itemContent}>
           <ThemedText style={styles.itemTitle}>{item.title}</ThemedText>
           <ThemedText style={styles.itemMeta}>{formatDate(item.date)}</ThemedText>
+          {item.repeat_type && item.repeat_type !== 'none' && (
+            <ThemedText style={[styles.itemMeta, { marginTop: 6 }]}>{repeatTextMap[item.repeat_type] || ''}</ThemedText>
+          )}
         </View>
         <View style={styles.itemActions}>
           <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton} accessibilityLabel="Edit">
@@ -530,6 +609,7 @@ export default function ImportantDatesScreen() {
                     setTitle('');
                     setDate('');
                     setReminderType('24_hours');
+                    setRepeatType('none');
                     setEditingId(null);
                     setPickerDate(new Date());
                     setShowVoiceDialog(true);
@@ -548,6 +628,7 @@ export default function ImportantDatesScreen() {
                     setTitle('');
                     setDate('');
                     setReminderType('24_hours');
+                    setRepeatType('none');
                     setEditingId(null);
                     setPickerDate(new Date());
                     setShowVoiceForm(false);
@@ -587,6 +668,55 @@ export default function ImportantDatesScreen() {
 
             <ThemedText style={styles.formLabel}>Date</ThemedText>
             <TextInput value={date} onChangeText={setDate} placeholder="MM/DD/YYYY" style={[styles.input, { color: textColor }]} />
+
+            <ThemedText style={styles.formLabel}>Remind me</ThemedText>
+            <View style={styles.reminderGrid}>
+              {reminderOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    styles.reminderOption,
+                    reminderType === opt.id && styles.reminderOptionSelected,
+                  ]}
+                  onPress={() => setReminderType(opt.id)}
+                >
+                  <Ionicons name={opt.icon} size={18} color={reminderType === opt.id ? '#fff' : '#6b7280'} />
+                  <Text style={[styles.reminderOptionText, reminderType === opt.id && styles.reminderOptionTextSelected]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <ThemedText style={styles.formLabel}>Repeat</ThemedText>
+            <View style={styles.reminderGrid}>
+              {repeatOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.id}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Repeat ${opt.label}`}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  style={[
+                    styles.reminderOption,
+                    repeatType === opt.id && styles.reminderOptionSelected,
+                  ]}
+                  onPress={() => setRepeatType(opt.id)}
+                >
+                  <Text style={[styles.reminderOptionText, repeatType === opt.id && styles.reminderOptionTextSelected]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={[styles.saveButton, { backgroundColor: '#10b981' }]} onPress={handleSave} accessibilityLabel="Save The Date">
+              <ThemedText type="defaultSemiBold" style={[styles.saveText, { color: '#fff' }]}>{saving ? 'Saving…' : (editingId ? 'Update Date' : 'Save The Date')}</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowManualForm(false)} accessibilityLabel="Cancel">
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -636,8 +766,30 @@ export default function ImportantDatesScreen() {
                       ]}
                       onPress={() => setReminderType(opt.id)}
                     >
-                      <Ionicons name={opt.icon} size={24} color={reminderType === opt.id ? '#fff' : '#6b7280'} />
+                      <Ionicons name={opt.icon} size={18} color={reminderType === opt.id ? '#fff' : '#6b7280'} />
                       <Text style={[styles.reminderOptionText, reminderType === opt.id && styles.reminderOptionTextSelected]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <ThemedText style={styles.label}>Repeat</ThemedText>
+                <View style={styles.reminderGrid}>
+                  {repeatOptions.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.id}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Repeat ${opt.label}`}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      style={[
+                        styles.reminderOption,
+                        repeatType === opt.id && styles.reminderOptionSelected
+                      ]}
+                      onPress={() => setRepeatType(opt.id)}
+                    >
+                      <Text style={[styles.reminderOptionText, repeatType === opt.id && styles.reminderOptionTextSelected]}>
                         {opt.label}
                       </Text>
                     </TouchableOpacity>
@@ -728,8 +880,30 @@ export default function ImportantDatesScreen() {
                       ]}
                       onPress={() => setReminderType(opt.id)}
                     >
-                      <Ionicons name={opt.icon} size={24} color={reminderType === opt.id ? '#fff' : '#6b7280'} />
+                      <Ionicons name={opt.icon} size={18} color={reminderType === opt.id ? '#fff' : '#6b7280'} />
                       <Text style={[styles.reminderOptionText, reminderType === opt.id && styles.reminderOptionTextSelected]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <ThemedText style={styles.label}>Repeat</ThemedText>
+                <View style={styles.reminderGrid}>
+                  {repeatOptions.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.id}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Repeat ${opt.label}`}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      style={[
+                        styles.reminderOption,
+                        repeatType === opt.id && styles.reminderOptionSelected
+                      ]}
+                      onPress={() => setRepeatType(opt.id)}
+                    >
+                      <Text style={[styles.reminderOptionText, repeatType === opt.id && styles.reminderOptionTextSelected]}>
                         {opt.label}
                       </Text>
                     </TouchableOpacity>
@@ -916,20 +1090,21 @@ const styles = StyleSheet.create({
   reminderOption: {
     width: '48%',
     backgroundColor: '#f3f4f6',
-    padding: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    minHeight: 64,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'transparent',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   reminderOptionSelected: {
     backgroundColor: '#10b981',
     borderColor: '#059669',
   },
   reminderOptionText: {
-    marginTop: 4,
     fontSize: 14,
     color: '#374151',
     fontWeight: '500',
