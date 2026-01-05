@@ -68,7 +68,25 @@ export default function AddMedicationsScreen() {
 
   const [name, setName] = useState(initialName);
   const [dosage, setDosage] = useState(initialDosage);
-  const [time, setTime] = useState(params.time || '');
+  // Support up to 3 times per day. Internally we store an array of selected times.
+  const parseTimesParam = (p) => {
+    if (!p) return [];
+    try {
+      if (typeof p === 'string') {
+        const trimmed = p.trim();
+        // Accept JSON string (e.g. "[\"08:00\",\"18:00\"]") or comma-separated string
+        if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+          return JSON.parse(trimmed);
+        }
+        return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      if (Array.isArray(p)) return p;
+      return [];
+    } catch (e) {
+      return [];
+    }
+  };
+  const [times, setTimes] = useState(parseTimesParam(params.time));
   const [notes, setNotes] = useState(initialNotes);
 
   // Track whether fields were auto-populated by OCR so UI can subtly highlight them
@@ -110,13 +128,15 @@ export default function AddMedicationsScreen() {
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
 
-    console.log('Saving medication with details:', { name, dosage, time, notes, verification });
+    console.log('Saving medication with details:', { name, dosage, times, notes, verification });
     try {
       const payload = {
         user_id: user.id,
         name: name.trim(),
         dosage: dosage.trim() || null,
-        time: time || null,
+        // Preserve backward compatibility: store first selected time in `time` and all selections in `times` (JSON string)
+        time: (times && times.length > 0) ? times[0] : null,
+        times: (times && times.length > 0) ? JSON.stringify(times) : null,
         notes: notes.trim() || null,
         verification: JSON.stringify(verification),
       };
@@ -194,37 +214,54 @@ export default function AddMedicationsScreen() {
           <View style={styles.field}>
             <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily }]}>Time</ThemedText>
             <View style={styles.timeOptionsContainer}>
-              {timeOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.timeOption,
-                    time === option.value && styles.timeOptionSelected,
-                    { borderColor: time === option.value ? '#10b981' : '#e5e7eb' }
-                  ]}
-                  onPress={() => setTime(option.value)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${option.label} at ${option.display}`}
-                >
-                  <Ionicons 
-                    name={option.icon} 
-                    size={24} 
-                    color={time === option.value ? '#10b981' : '#6b7280'} 
-                  />
-                  <ThemedText style={[
-                    styles.timeOptionLabel, 
-                    { fontFamily: uiFontFamily, color: time === option.value ? '#10b981' : '#6b7280' }
-                  ]}>
-                    {option.label}
-                  </ThemedText>
-                  <ThemedText style={[
-                    styles.timeOptionValue, 
-                    { fontFamily: uiFontFamily, color: time === option.value ? '#10b981' : '#9ca3af' }
-                  ]}>
-                    {option.display}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
+              {timeOptions.map((option) => {
+                const idx = times.indexOf(option.value);
+                const selected = idx !== -1;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.timeOption,
+                      selected && styles.timeOptionSelected,
+                      { borderColor: selected ? '#10b981' : '#e5e7eb' }
+                    ]}
+                    onPress={() => {
+                      if (selected) {
+                        setTimes((prev) => prev.filter((t) => t !== option.value));
+                      } else {
+                        if (times.length >= 3) {
+                          Alert.alert('Limit reached', 'You can select up to 3 times per day.');
+                          return;
+                        }
+                        setTimes((prev) => [...prev, option.value]);
+                      }
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${option.label} at ${option.display}`}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={24}
+                      color={selected ? '#10b981' : '#6b7280'}
+                    />
+                    <ThemedText style={[
+                      styles.timeOptionLabel,
+                      { fontFamily: uiFontFamily, color: selected ? '#10b981' : '#6b7280' }
+                    ]}>
+                      {option.label}
+                    </ThemedText>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <ThemedText style={[
+                        styles.timeOptionValue,
+                        { fontFamily: uiFontFamily, color: selected ? '#10b981' : '#9ca3af' }
+                      ]}>
+                        {option.display}
+                      </ThemedText>
+                    </View>
+                    {selected ? <View style={styles.timeBadge}><ThemedText style={styles.timeBadgeText}>{idx + 1}</ThemedText></View> : null}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -293,7 +330,7 @@ const styles = StyleSheet.create({
   appBar: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
   backButton: { padding: 8 },
   appBarRight: { width: 32 },
-  title: { 
+  title: {
     fontSize: 20,
     fontWeight: '600',
     color: '#111827',
@@ -325,6 +362,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
     marginBottom: 10,
+    position: 'relative',
   },
   timeOptionSelected: {
     backgroundColor: '#ecfdf5',
@@ -341,5 +379,9 @@ const styles = StyleSheet.create({
   footer: { padding: 20, borderTopWidth: 0 },
   saveButton: { padding: 16, borderRadius: 12, alignItems: 'center' },
   saveText: { fontSize: 18 },
+  // Badge that shows the selection order (1..3) when multiple times selected
+  // Circular badge that shows the selection order (1..3). Fixed 20x20 for round shape.
+  timeBadge: { position: 'absolute', bottom: 8, right: 8, backgroundColor: '#10b981', width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  timeBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700', lineHeight: 14 },
 
 });

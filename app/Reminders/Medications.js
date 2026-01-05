@@ -36,29 +36,43 @@ export default function MedicationsScreen() {
 
   useEffect(() => {
     medications.forEach((med) => {
-      //console.log('Medications updated, scheduling notifications...', med);
-      if (!med.time) return;
+      // Support multiple times (times JSON) or legacy `time` string
+      const times = (() => {
+        if (med.times) {
+          try {
+            return typeof med.times === 'string' ? JSON.parse(med.times) : med.times;
+          } catch (e) {
+            return [];
+          }
+        }
+        if (med.time) return [med.time];
+        return [];
+      })();
 
-      console.log('Medications updated, scheduling notifications for', med.name, 'at', med.time);
+      if (!times || times.length === 0) return;
 
-      const [hour, minute] = med.time.split(':').map(Number);
-      const date = new Date();
-      date.setHours(hour, minute, 0);
+      times.forEach((t) => {
+        if (!t) return;
+        console.log('Medications updated, scheduling notifications for', med.name, 'at', t);
+        const [hour, minute] = t.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hour, minute, 0, 0);
+        // If time already passed today → schedule tomorrow
+        if (date < new Date()) date.setDate(date.getDate() + 1);
 
-      // If time already passed today → schedule tomorrow
-      if (date < new Date()) {
-        date.setDate(date.getDate() + 1);
-      }
-
-      console.log('Scheduling notification for', med.name, 'at', date);
-
-      scheduleNotification({
-        id: `medication-${med.id}`,
-        title: 'Medication Reminder',
-        body: `Time to take ${med.name}`,
-        date,
-        repeat: true,
-        type: 'medication',
+        const notificationId = `medication-${med.id}-${t}`;
+        scheduleNotification({
+          id: notificationId,
+          title: 'Medication Reminder',
+          body: `Time to take ${med.name}`,
+          date,
+          type: 'medication',
+          data: {
+            medicationId: med.id,
+            time: t,
+            repeatType: 'daily',
+          },
+        });
       });
     });
   }, [medications]);
