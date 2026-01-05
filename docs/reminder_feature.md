@@ -110,17 +110,29 @@ Main Content
 7. On “Save Medicine”, store data in Supabase `medications` table.
 ```
 
-### 4.2 Multiple Daily Medication Times (Up to 3 per Day)
+### 4.2 Multiple Daily Medication Times
 
-This feature allows users to select **up to three times per day** for a single medication reminder.
+Users can select **any number of the available time options** for a single medication reminder.
 
 #### Purpose
-Support common schedules like morning + afternoon + night while keeping the UI simple.
+Allow users to select all applicable daily times (e.g. Before Breakfast, After Breakfast, Lunch, Dinner, Bedtime).
 
 #### UX Rules
-- Max 3 selections
+- No limit on number of selections
 - Tap to toggle
-- Friendly warning if exceeding limit
+- All options are equal and optional
+
+#### Time Options
+- Before Breakfast — 07:00 AM
+- After Breakfast — 08:00 AM (renamed from Breakfast)
+- Lunch — 12:30 PM
+- Dinner — 06:00 PM
+- Bedtime — 09:00 PM
+
+The UI/UX of **Before Breakfast** must be exactly the same as other time cards.
+
+#### Data Changes
+Use the existing `times` JSON array to store selected values, including `"07:00"` for Before Breakfast.
 
 #### Notification Rules
 - Schedule one notification per selected time

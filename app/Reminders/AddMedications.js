@@ -68,7 +68,7 @@ export default function AddMedicationsScreen() {
 
   const [name, setName] = useState(initialName);
   const [dosage, setDosage] = useState(initialDosage);
-  // Support up to 3 times per day. Internally we store an array of selected times.
+  // Support any number of times per day. Internally we store an array of selected times.
   const parseTimesParam = (p) => {
     if (!p) return [];
     try {
@@ -107,7 +107,8 @@ export default function AddMedicationsScreen() {
   const [saving, setSaving] = useState(false);
 
   const timeOptions = [
-    { label: 'Breakfast', value: '08:00', display: '08:00 AM', icon: 'sunny-outline' },
+    { label: 'Before Breakfast', value: '07:00', display: '07:00 AM', icon: 'sunny-outline' },
+    { label: 'After Breakfast', value: '08:00', display: '08:00 AM', icon: 'sunny' },
     { label: 'Lunch', value: '12:30', display: '12:30 PM', icon: 'restaurant-outline' },
     { label: 'Dinner', value: '18:00', display: '06:00 PM', icon: 'moon-outline' },
     { label: 'Bedtime', value: '21:00', display: '09:00 PM', icon: 'bed-outline' },
@@ -229,10 +230,6 @@ export default function AddMedicationsScreen() {
                       if (selected) {
                         setTimes((prev) => prev.filter((t) => t !== option.value));
                       } else {
-                        if (times.length >= 3) {
-                          Alert.alert('Limit reached', 'You can select up to 3 times per day.');
-                          return;
-                        }
                         setTimes((prev) => [...prev, option.value]);
                       }
                     }}
