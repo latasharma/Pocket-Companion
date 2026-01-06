@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -47,9 +47,11 @@ export default function Appointments() {
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
 
-  useEffect(() => {
-    fetchEvents();
-  }, [currentDate]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvents();
+    }, [currentDate])
+  );
 
   useEffect(() => {
     // Scroll to 8 AM roughly on mount
