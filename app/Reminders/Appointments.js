@@ -46,11 +46,13 @@ export default function Appointments() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
+  const gridHorizontalScrollRef = useRef(null);
+  const scrollingSource = useRef(null);
 
   useFocusEffect(
     useCallback(() => {
       fetchEvents();
-    }, [currentDate])
+    }, [visibleMonth])
   );
 
   useEffect(() => {
@@ -81,16 +83,13 @@ export default function Appointments() {
         return;
       }
 
-      const startOfWeek = new Date(currentDate);
-      startOfWeek.setDate(currentDate.getDate() - currentDate.getDay()); // Sunday
-      startOfWeek.setHours(0, 0, 0, 0);
-
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 7);
+      const startOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+      const endOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
 
       const allEvents = await RNCalendarEvents.fetchAllEvents(
-        startOfWeek.toISOString(),
-        endOfWeek.toISOString()
+        startOfMonth.toISOString(),
+        endOfMonth.toISOString()
       );
       setEvents(allEvents);
     } catch (e) {
@@ -100,18 +99,6 @@ export default function Appointments() {
     }
   };
 
-  const getWeekDays = () => {
-    const days = [];
-    const start = new Date(currentDate);
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      days.push(d);
-    }
-    return days;
-  };
-
-  const weekDays = getWeekDays();
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   const getMonthDays = (date) => {
@@ -136,6 +123,9 @@ export default function Appointments() {
     if (index >= 0) {
       const x = index * DAY_ITEM_WIDTH - (width / 2) + (DAY_ITEM_WIDTH / 2);
       monthScrollRef.current.scrollTo({ x: Math.max(0, x), animated: false });
+      setTimeout(() => {
+        gridHorizontalScrollRef.current?.scrollTo({ x: Math.max(0, x), animated: false });
+      }, 50);
     }
   }, []);
 
@@ -192,18 +182,26 @@ export default function Appointments() {
       date.getFullYear() === selectedDate.getFullYear();
   };
 
-  const changeWeek = (offset) => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + offset);
-    setCurrentDate(newDate);
-  };
-
   const changeMonth = (offset) => {
     const newDate = new Date(visibleMonth);
     newDate.setDate(1);
     newDate.setMonth(newDate.getMonth() + offset);
     setVisibleMonth(newDate);
     setCurrentDate(newDate);
+  };
+
+  const onHeaderScroll = (event) => {
+    if (scrollingSource.current === 'grid') return;
+    scrollingSource.current = 'header';
+    const x = event.nativeEvent.contentOffset.x;
+    gridHorizontalScrollRef.current?.scrollTo({ x, animated: false });
+  };
+
+  const onGridScroll = (event) => {
+    if (scrollingSource.current === 'header') return;
+    scrollingSource.current = 'grid';
+    const x = event.nativeEvent.contentOffset.x;
+    monthScrollRef.current?.scrollTo({ x, animated: false });
   };
 
   const renderEventsForDay = (day) => {
@@ -274,6 +272,9 @@ export default function Appointments() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.monthDaysScroll}
+              onScroll={onHeaderScroll}
+              scrollEventThrottle={16}
+              onScrollBeginDrag={() => { scrollingSource.current = 'header'; }}
             >
               {monthDays.map((day, idx) => {
                 const selected = isSelected(day);
@@ -311,8 +312,16 @@ export default function Appointments() {
               </View>
 
               {/* Days Columns */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-                {weekDays.map((day, dayIndex) => (
+              <ScrollView
+                ref={gridHorizontalScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ flex: 1 }}
+                onScroll={onGridScroll}
+                scrollEventThrottle={16}
+                onScrollBeginDrag={() => { scrollingSource.current = 'grid'; }}
+              >
+                {monthDays.map((day, dayIndex) => (
                   <View key={dayIndex} style={styles.dayColumn}>
                     {/* Header space removed (weekday labels duplicated above). Keep spacing for alignment */}
                     <View style={{ height: HEADER_HEIGHT }} />
