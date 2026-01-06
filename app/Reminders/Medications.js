@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -18,6 +18,7 @@ export default function MedicationsScreen() {
   const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Theme-aware colors
@@ -382,6 +383,15 @@ export default function MedicationsScreen() {
 
         {/* Footer column with two stacked buttons */}
         <View style={styles.footerColumn}>
+          <TouchableOpacity 
+            style={styles.disclaimerLink} 
+            onPress={() => setShowDisclaimer(true)}
+            accessibilityRole="button"
+            accessibilityLabel="View Important Medical Disclaimer"
+          >
+            <ThemedText style={[styles.disclaimerLinkText, { fontFamily: uiFontFamily }]}>Important Medical Disclaimer</ThemedText>
+          </TouchableOpacity>
+
           <TouchableOpacity style={[styles.footerButton, styles.footerPrimary]} onPress={handleContinue} accessibilityLabel="Continue">
             <ThemedText type="defaultSemiBold" style={[styles.footerButtonText]}>Continue</ThemedText>
           </TouchableOpacity>
@@ -398,6 +408,42 @@ export default function MedicationsScreen() {
           </View>
         )}
     
+        {/* Medical Disclaimer Bottom Sheet */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={showDisclaimer}
+          onRequestClose={() => setShowDisclaimer(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <ThemedText style={[styles.modalTitle, { fontFamily: uiFontFamily }]}>Medical Disclaimer</ThemedText>
+                <TouchableOpacity 
+                  onPress={() => setShowDisclaimer(false)}
+                  style={styles.closeButton}
+                  hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                  accessibilityLabel="Close disclaimer"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="close" size={24} color="#374151" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={true}>
+                <ThemedText style={[styles.disclaimerText, { fontFamily: uiFontFamily }]}>
+                  • PoCo is an AI companion tool designed to assist with organization and companionship. It is NOT a medical device and NOT a substitute for professional medical advice, diagnosis, or treatment.{'\n\n'}
+                  • Medication Management: The scanning and reminder features are aids for convenience. You are responsible for verifying all medication details (names, dosages, times) against your actual prescription labels.{'\n\n'}
+                  • AI Limitations: PoCo uses artificial intelligence which may occasionally produce inaccurate or misleading information. Do not rely on this app for medical decisions, dosage calculations, or identifying pills.{'\n\n'}
+                  • No Professional Relationship: Use of PoCo does not create a doctor-patient or provider-patient relationship. Always consult a qualified healthcare professional for medical concerns.{'\n\n'}
+                  • Emergencies: In case of a medical emergency, overdose, or severe symptoms, call emergency services (e.g., 911) immediately. Do not rely on PoCo for emergency assistance.
+                </ThemedText>
+                <View style={{height: 40}} />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
       </ThemedView>
     </SafeAreaView>
   );
@@ -482,6 +528,64 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   footerSecondaryText: {
+    color: '#374151',
+  },
+  disclaimerLink: {
+    alignItems: 'flex-end',
+    padding: 8,
+    marginTop: 8,
+    minHeight: 44, // Accessibility requirement
+  },
+  disclaimerLinkText: {
+    color: '#6b7280',
+    textDecorationLine: 'underline',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '80%',
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  closeButton: {
+    padding: 8,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBody: {
+    flex: 1,
+  },
+  disclaimerText: {
+    fontSize: 16,
+    lineHeight: 26,
     color: '#374151',
   },
 });
