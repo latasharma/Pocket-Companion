@@ -10,6 +10,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { parseMedicationFromOCR, performGeminiVisionOCRFromUrl } from '@/lib/aiService';
 import { supabase } from '@/lib/supabase';
+import { MEDICAL_DISCLAIMER } from '../../constants/Strings';
 import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 
 export default function MedicationsScreen() {
@@ -430,13 +431,9 @@ export default function MedicationsScreen() {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={true}>
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
                 <ThemedText style={[styles.disclaimerText, { fontFamily: uiFontFamily }]}>
-                  • PoCo is an AI companion tool designed to assist with organization and companionship. It is NOT a medical device and NOT a substitute for professional medical advice, diagnosis, or treatment.{'\n\n'}
-                  • Medication Management: The scanning and reminder features are aids for convenience. You are responsible for verifying all medication details (names, dosages, times) against your actual prescription labels.{'\n\n'}
-                  • AI Limitations: PoCo uses artificial intelligence which may occasionally produce inaccurate or misleading information. Do not rely on this app for medical decisions, dosage calculations, or identifying pills.{'\n\n'}
-                  • No Professional Relationship: Use of PoCo does not create a doctor-patient or provider-patient relationship. Always consult a qualified healthcare professional for medical concerns.{'\n\n'}
-                  • Emergencies: In case of a medical emergency, overdose, or severe symptoms, call emergency services (e.g., 911) immediately. Do not rely on PoCo for emergency assistance.
+                  {MEDICAL_DISCLAIMER}
                 </ThemedText>
                 <View style={{height: 40}} />
               </ScrollView>
