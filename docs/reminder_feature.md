@@ -118,30 +118,16 @@ A medical disclaimer hyperlink must be displayed on the Medications screen to cl
 ```
 IMPORTANT MEDICAL DISCLAIMER
 
-* Doctr is NOT a substitute for professional medical advice, diagnosis, 
-  treatment, or emergency services under any circumstances.
+* PoCo is an AI companion tool designed to assist with organization and companionship. It is NOT a medical device and NOT a substitute for professional medical advice, diagnosis, or treatment.
 
-* NO doctor-patient relationship is created by your use of this application. 
-  Our AI-powered responses do not constitute medical practice.
+* The scanning and reminder features are aids for convenience. You are responsible for verifying all medication details (names, dosages, times) against your actual prescription labels.
 
-* ALL information provided by Doctr is for informational and educational 
-  purposes ONLY and should never be considered medical advice.
+* PoCo uses artificial intelligence which may occasionally produce inaccurate or misleading information. Do not rely on this app for medical decisions, dosage calculations, or identifying pills.
 
-* ALWAYS consult with a qualified healthcare professional before making any 
-  health-related decisions or acting on information provided through this 
-  application.
+* Use of PoCo does not create a doctor-patient or provider-patient relationship. Always consult a qualified healthcare professional for medical concerns.
 
-* In case of a medical emergency, IMMEDIATELY call emergency services 
-  (911 in the US) or your local emergency number, or go to the nearest 
-  emergency room.
+* In case of a medical emergency, overdose, or severe symptoms, call emergency services (e.g., 911) immediately. Do not rely on PoCo for emergency assistance.
 
-* If you are experiencing chest pain, shortness of breath, severe bleeding, 
-  loss of consciousness, or any symptoms that could be life-threatening, 
-  seek immediate medical attention.
-
-* Doctr does NOT warrant or guarantee the accuracy, completeness, timeliness, 
-  reliability, suitability, or availability of information provided through 
-  the application.
 ```
 
 #### Accessibility & UX Requirements
