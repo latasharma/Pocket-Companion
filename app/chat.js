@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -239,6 +240,27 @@ export default function ChatScreen() {
   const handleVoiceInputToggle = async () => {
     if (!voiceInputEnabled || isLoading) {
       console.log("Voice input is disabled or loading");
+      return;
+    }
+
+    // Ensure microphone permission is granted before starting voice input
+    try {
+      const current = await Audio.getPermissionsAsync();
+      console.log(':::K handleVoiceInputToggle current ===>', current);
+      if (current.status !== 'granted') {
+        const requested = await Audio.requestPermissionsAsync();
+        if (requested.status !== 'granted') {
+          console.log('Microphone permission denied by user');
+          Alert.alert(
+            'Microphone Permission',
+            'Microphone access is required for voice input. Please enable it in your device settings.'
+          );
+          return; // Do not proceed without permission
+        }
+      }
+    } catch (permError) {
+      console.error('Error checking/requesting microphone permission:', permError);
+      Alert.alert('Permission Error', 'Could not obtain microphone permission. Please try again.');
       return;
     }
 

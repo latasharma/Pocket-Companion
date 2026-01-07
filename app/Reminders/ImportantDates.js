@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, AppState, FlatList, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, AppState, FlatList, Linking, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+import { check, PERMISSIONS, request, RESULTS } from 'react-native-permissions';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -216,7 +218,42 @@ export default function ImportantDatesScreen() {
 
   const startVoiceForField = async (field) => {
     try {
+      // Ensure microphone permission is granted using react-native-permissions
+      const permission = Platform.OS === 'ios' ? PERMISSIONS.IOS.MICROPHONE : PERMISSIONS.ANDROID.RECORD_AUDIO;
+      
+      let status = await check(permission);
+      console.log(':::K startVoiceForField status', status);
+      if (status === RESULTS.DENIED) {
+        // Permission not requested / denied - request it
+        const req = await request(permission);
+        if (req !== RESULTS.GRANTED) {
+          Alert.alert('Permission required', 'Microphone permission is required to use voice input.');
+          return;
+        }
+      } else if (status === RESULTS.BLOCKED) {
+        // Permanently denied - instruct user to open settings
+        Alert.alert(
+          'Microphone permission blocked',
+          'Microphone permission is blocked. Please enable it in the app settings to use voice input.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      } else if (status !== RESULTS.GRANTED) {
+        // For other statuses (e.g., limited/unavailable) attempt to request
+        const req = await request(permission);
+        if (req !== RESULTS.GRANTED) {
+          Alert.alert('Permission required', 'Microphone permission is required to use voice input.');
+          return;
+        }
+      }
+
+      console.log(':::K startVoiceForField ');
+      // At this point permission should be GRANTED
       const ok = await VoiceInputService.initialize();
+      console.log(':::K startVoiceForField Ok', ok);
       if (!ok) {
         Alert.alert('Permission required', 'Microphone permission is required to use voice input.');
         return;
