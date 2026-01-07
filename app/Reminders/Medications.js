@@ -10,7 +10,6 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { parseMedicationFromOCR, performGeminiVisionOCRFromUrl } from '@/lib/aiService';
 import { supabase } from '@/lib/supabase';
-import { MEDICAL_DISCLAIMER } from '../../constants/Strings';
 import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 
 export default function MedicationsScreen() {
@@ -28,6 +27,25 @@ export default function MedicationsScreen() {
 
   // Prefer a humanist sans-serif if available; fallback to system font.
   const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
+
+  const disclaimerPoints = [
+    {
+      icon: 'information-circle',
+      text: 'The content provided in this app is for informational purposes only and is not intended as a substitute for professional medical advice, diagnosis, or treatment.'
+    },
+    {
+      icon: 'medkit',
+      text: 'Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.'
+    },
+    {
+      icon: 'warning',
+      text: 'Never disregard professional medical advice or delay in seeking it because of something you have read on this app.'
+    },
+    {
+      icon: 'call',
+      text: 'If you think you may have a medical emergency, call your doctor or emergency services immediately.'
+    }
+  ];
 
   useFocusEffect(
     useCallback(() => {
@@ -419,7 +437,7 @@ export default function MedicationsScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <ThemedText style={[styles.modalTitle, { fontFamily: uiFontFamily }]}>Medical Disclaimer</ThemedText>
+                <ThemedText style={[styles.modalTitle, { fontFamily: uiFontFamily }]}>Important Medical Disclaimer</ThemedText>
                 <TouchableOpacity 
                   onPress={() => setShowDisclaimer(false)}
                   style={styles.closeButton}
@@ -432,9 +450,12 @@ export default function MedicationsScreen() {
               </View>
               
               <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                <ThemedText style={[styles.disclaimerText, { fontFamily: uiFontFamily }]}>
-                  {MEDICAL_DISCLAIMER}
-                </ThemedText>
+                {disclaimerPoints.map((point, index) => (
+                  <View key={index} style={styles.disclaimerItem}>
+                    <Ionicons name={point.icon} size={20} color="#10b981" style={styles.disclaimerIcon} />
+                    <ThemedText style={[styles.disclaimerText, { fontFamily: uiFontFamily }]}>{point.text}</ThemedText>
+                  </View>
+                ))}
                 <View style={{height: 40}} />
               </ScrollView>
             </View>
@@ -534,7 +555,7 @@ const styles = StyleSheet.create({
     minHeight: 44, // Accessibility requirement
   },
   disclaimerLinkText: {
-    color: '#6b7280',
+    color: '#ef4444',
     textDecorationLine: 'underline',
     fontSize: 14,
     fontWeight: '500',
@@ -568,7 +589,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#ef4444',
   },
   closeButton: {
     padding: 8,
@@ -580,9 +601,19 @@ const styles = StyleSheet.create({
   modalBody: {
     flex: 1,
   },
+  disclaimerItem: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    alignItems: 'flex-start',
+  },
+  disclaimerIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
   disclaimerText: {
     fontSize: 16,
     lineHeight: 26,
     color: '#374151',
+    flex: 1,
   },
 });
