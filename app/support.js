@@ -1,12 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SupportScreen() {
   const handleEmailSupport = () => {
-    Linking.openURL('mailto:support@poco.ai?subject=PoCo Support Request');
+    Linking.openURL('mailto:lata@hellopoco.app?subject=PoCo Support Request');
   };
 
   return (

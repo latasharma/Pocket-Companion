@@ -1,8 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function TermsOfServiceScreen() {
   return (
@@ -86,7 +85,7 @@ export default function TermsOfServiceScreen() {
           <Text style={styles.text}>
             For questions about these Terms of Service, contact us at:
           </Text>
-          <Text style={styles.contact}>support@poco.ai</Text>
+          <Text style={styles.contact}>lata@hellopoco.app</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
