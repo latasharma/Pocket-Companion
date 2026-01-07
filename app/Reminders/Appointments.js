@@ -19,14 +19,11 @@ import RNCalendarEvents from 'react-native-calendar-events';
 
 const { width } = Dimensions.get('window');
 const TIME_COL_WIDTH = 50;
-// Day column width: divide remaining width by 7 (one column per weekday)
 const DAY_COL_WIDTH = (width - TIME_COL_WIDTH) / 7;
-// Make the month-day item match the column width so the day labels align
 const DAY_ITEM_WIDTH = DAY_COL_WIDTH;
 const HOUR_HEIGHT = 100;
 const HEADER_HEIGHT = 40;
 
-// Simple Appointments screen implementing the requirements from docs/reminder-redesign.md (section 5)
 export default function Appointments() {
   const handleBack = () => router.back();
 
@@ -45,18 +42,19 @@ export default function Appointments() {
   });
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState(null);
   const scrollViewRef = useRef(null);
   const gridHorizontalScrollRef = useRef(null);
   const scrollingSource = useRef(null);
 
+  // Check permission status on mount and when screen focuses
   useFocusEffect(
     useCallback(() => {
-      fetchEvents();
+      checkAndFetchEvents();
     }, [visibleMonth])
   );
 
   useEffect(() => {
-    // Scroll to 8 AM roughly on mount
     if (scrollViewRef.current) {
       setTimeout(() => {
         scrollViewRef.current.scrollTo({ y: 8 * HOUR_HEIGHT, animated: false });
@@ -64,25 +62,70 @@ export default function Appointments() {
     }
   }, []);
 
+  const checkAndFetchEvents = async () => {
+    try {
+      // First check current permission status
+      const status = await RNCalendarEvents.checkPermissions();
+      console.log('Current permission status:', status);
+      setPermissionStatus(status);
+
+      if (status === 'authorized') {
+        // Permission already granted, fetch events
+        await fetchEvents();
+      } else if (status === 'denied') {
+        // Permission was explicitly denied, show alert to go to settings
+        showPermissionDeniedAlert();
+      } else if (status === 'restricted') {
+        // Permission was explicitly denied, show alert to go to settings
+        showPermissionDeniedAlert();
+      } else {
+        // Permission not determined yet, request it
+        await requestPermissionAndFetch();
+      }
+    } catch (e) {
+      console.log('Error checking permissions', e);
+      setLoading(false);
+    }
+  };
+
+  const requestPermissionAndFetch = async () => {
+    try {
+      const permission = await RNCalendarEvents.requestPermissions();
+      console.log('Permission request result:', permission);
+      setPermissionStatus(permission);
+
+      if (permission === 'authorized') {
+        await fetchEvents();
+      } else {
+        showPermissionDeniedAlert();
+      }
+    } catch (e) {
+      console.log('Error requesting permissions', e);
+      setLoading(false);
+    }
+  };
+
+  const showPermissionDeniedAlert = () => {
+    Alert.alert(
+      'Calendar Permission Required',
+      'This app needs access to your calendar to display appointments. Please enable calendar access in your device settings.',
+      [
+        { text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => router.back()
+        },
+        { 
+          text: 'Open Settings', 
+          onPress: () => Linking.openSettings() 
+        },
+      ]
+    );
+  };
+
   const fetchEvents = async () => {
+    console.log('Fetching calendar events...');
     setLoading(true);
     try {
-      // Request permissions if needed
-      const permission = await RNCalendarEvents.requestPermissions();
-
-      if (permission !== 'authorized') {
-        Alert.alert(
-          'Permission Required',
-          'Calendar access is required to display your appointments. Please enable it in Settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() }
-          ]
-        );
-        setLoading(false);
-        return;
-      }
-
       const startOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
       const endOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0);
       endOfMonth.setHours(23, 59, 59, 999);
@@ -91,9 +134,18 @@ export default function Appointments() {
         startOfMonth.toISOString(),
         endOfMonth.toISOString()
       );
+      console.log(`Fetched ${allEvents.length} events`);
       setEvents(allEvents);
     } catch (e) {
       console.log('Error fetching events', e);
+      Alert.alert(
+        'Error',
+        'Failed to fetch calendar events. Please try again.',
+        [
+          { text: 'OK' },
+          { text: 'Retry', onPress: () => checkAndFetchEvents() }
+        ]
+      );
     } finally {
       setLoading(false);
     }
@@ -115,8 +167,6 @@ export default function Appointments() {
   const monthDays = getMonthDays(visibleMonth || new Date());
   const monthScrollRef = useRef(null);
 
-  // Center the month/day strip on the selected date (usually today) when the
-  // screen is first opened. This ensures the current day is visible by default.
   useEffect(() => {
     if (!monthScrollRef.current) return;
     const index = monthDays.findIndex(d => isSelected(d) || isToday(d));
@@ -129,9 +179,6 @@ export default function Appointments() {
     }
   }, []);
 
-  // When events load or selectedDate changes, ensure the time grid is scrolled
-  // vertically so events for the selected day are visible. Scroll to the
-  // earliest event of the day (with some top padding) or fall back to 8 AM.
   useEffect(() => {
     if (!scrollViewRef.current) return;
     const dayEvents = events.filter(e => {
@@ -148,7 +195,7 @@ export default function Appointments() {
       }, dayEvents[0]);
       const s = new Date(earliest.startDate);
       const top = (s.getHours() * HOUR_HEIGHT) + ((s.getMinutes() / 60) * HOUR_HEIGHT);
-      const offset = Math.max(0, top - HOUR_HEIGHT); // show some context above
+      const offset = Math.max(0, top - HOUR_HEIGHT);
       scrollViewRef.current.scrollTo({ y: offset, animated: true });
     } else {
       scrollViewRef.current.scrollTo({ y: 8 * HOUR_HEIGHT, animated: false });
@@ -159,7 +206,6 @@ export default function Appointments() {
     const newDate = new Date(date);
     newDate.setDate(newDate.getDate() - newDate.getDay());
     setCurrentDate(newDate);
-    // keep visible month in sync with selected date
     setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
   };
 
@@ -219,8 +265,8 @@ export default function Appointments() {
       const startHours = start.getHours();
       const startMinutes = start.getMinutes();
       const top = (startHours * HOUR_HEIGHT) + ((startMinutes / 60) * HOUR_HEIGHT);
-      let duration = (end - start) / (1000 * 60); // minutes
-      if (duration < 30) duration = 30; // Minimum visual height
+      let duration = (end - start) / (1000 * 60);
+      if (duration < 30) duration = 30;
       const height = (duration / 60) * HOUR_HEIGHT;
 
       return (
@@ -242,6 +288,19 @@ export default function Appointments() {
   };
 
   const monthLabel = visibleMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // Empty calendar message when no events
+  const renderEmptyCalendar = () => {
+    if (events.length === 0 && !loading && permissionStatus === 'authorized') {
+      return (
+        <View style={styles.emptyMessage}>
+          <Ionicons name="calendar-outline" size={48} color="#9ca3af" />
+          <Text style={styles.emptyMessageText}>No events for this month</Text>
+        </View>
+      );
+    }
+    return null;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -265,7 +324,6 @@ export default function Appointments() {
             </TouchableOpacity>
           </View>
 
-          {/* Month Days Strip */}
           <View style={styles.monthDaysWrapper}>
             <ScrollView
               ref={monthScrollRef}
@@ -296,10 +354,8 @@ export default function Appointments() {
             </ScrollView>
           </View>
 
-          {/* Scrollable Grid */}
           <ScrollView ref={scrollViewRef} style={styles.gridScrollView} contentContainerStyle={styles.gridContent}>
             <View style={styles.gridContainer}>
-              {/* Time Column */}
               <View style={styles.timeColumn}>
                 <View style={{ height: HEADER_HEIGHT }} />
                 {hours.map((hour) => (
@@ -311,7 +367,6 @@ export default function Appointments() {
                 ))}
               </View>
 
-              {/* Days Columns */}
               <ScrollView
                 ref={gridHorizontalScrollRef}
                 horizontal
@@ -323,19 +378,12 @@ export default function Appointments() {
               >
                 {monthDays.map((day, dayIndex) => (
                   <View key={dayIndex} style={styles.dayColumn}>
-                    {/* Header space removed (weekday labels duplicated above). Keep spacing for alignment */}
                     <View style={{ height: HEADER_HEIGHT }} />
-
                     <View style={{ position: 'relative' }}>
-                      {/* Grid Lines */}
                       {hours.map((hour) => (
                         <View key={hour} style={styles.gridCell} />
                       ))}
-
-                      {/* Events */}
                       {renderEventsForDay(day)}
-
-                      {/* Current Time Indicator (if today) */}
                       {isToday(day) && (
                         <View
                           style={[
@@ -352,6 +400,8 @@ export default function Appointments() {
               </ScrollView>
             </View>
           </ScrollView>
+
+          {renderEmptyCalendar()}
 
           {loading && (
             <View style={styles.loadingOverlay}>
@@ -415,23 +465,6 @@ const styles = StyleSheet.create({
   navButton: {
     padding: 4,
   },
-  weekHeader: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-    paddingVertical: 8,
-  },
-  dayHeader: {
-    width: DAY_COL_WIDTH,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayName: {
-    fontSize: 11,
-    color: '#666',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
   dayNumberContainer: {
     width: 30,
     height: 30,
@@ -453,10 +486,6 @@ const styles = StyleSheet.create({
   selectedCircle: {
     backgroundColor: '#e0f2fe',
   },
-  selectedDayText: {
-    color: '#1a73e8',
-    fontWeight: '600',
-  },
   selectedDayNumberText: {
     color: '#1a73e8',
     fontWeight: '600',
@@ -467,7 +496,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   monthDaysScroll: {
-    // left padding matches the time column width to align month strip items with the day columns below
     paddingLeft: TIME_COL_WIDTH,
     paddingRight: 8,
     paddingVertical: 10,
@@ -478,9 +506,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 0,
   },
-  dayItemSelected: {
-    // subtle background for selected day
-  },
+  dayItemSelected: {},
   dayItemWeekday: {
     fontSize: 11,
     color: '#666',
@@ -504,13 +530,13 @@ const styles = StyleSheet.create({
   },
   timeLabelContainer: {
     height: HOUR_HEIGHT,
-    justifyContent: 'flex-start', // Align time to top of line
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   timeLabel: {
     fontSize: 10,
     color: '#666',
-    transform: [{ translateY: -6 }], // Shift up to align with grid line
+    transform: [{ translateY: -6 }],
   },
   dayColumn: {
     width: DAY_COL_WIDTH,
@@ -558,36 +584,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  columnHeader: {
-    height: HEADER_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#f9fafb',
-  },
-  columnHeaderDay: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  columnHeaderDateBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  emptyMessage: {
+    position: 'absolute',
+    top: '40%',
+    left: 0,
+    right: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  todayBadge: {
-    backgroundColor: '#10b981',
-  },
-  columnHeaderDate: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  todayDateText: {
-    color: '#fff',
+  emptyMessageText: {
+    fontSize: 16,
+    color: '#9ca3af',
+    marginTop: 12,
   },
 });
