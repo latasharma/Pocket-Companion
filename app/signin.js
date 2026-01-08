@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -6,6 +7,7 @@ import { supabase } from '../lib/supabase';
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
@@ -241,7 +243,17 @@ export default function SignInScreen() {
           <Text style={{ fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 8 }}>
             Password
           </Text>
-              <TextInput
+          <View style={{
+            width: '100%',
+            height: 48,
+            borderWidth: 1,
+            borderColor: '#d1d5db',
+            borderRadius: 8,
+            backgroundColor: '#ffffff',
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}>
+            <TextInput
             placeholder="Enter your password"
                 value={password}
             onChangeText={(text) => {
@@ -256,19 +268,23 @@ export default function SignInScreen() {
                 validatePassword(password);
               }
             }}
-                secureTextEntry
+            secureTextEntry={!isPasswordVisible}
             style={{
-              width: '100%',
-              height: 48,
-              borderWidth: 1,
-              borderColor: '#d1d5db',
-              borderRadius: 8,
+              flex: 1,
+              height: '100%',
               paddingHorizontal: 16,
-              backgroundColor: '#ffffff',
               fontSize: 16,
             }}
             editable={!isLoading}
           />
+          <TouchableOpacity
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            style={{ padding: 10 }}
+            accessibilityLabel={isPasswordVisible ? "Hide password" : "Show password"}
+          >
+            <Ionicons name={isPasswordVisible ? "eye-off" : "eye"} size={24} color="#6b7280" />
+          </TouchableOpacity>
+          </View>
           {isSignUp && (
             <View style={{ marginTop: 8 }}>
               <Text style={{ fontSize: 12, fontWeight: '500', color: '#374151', marginBottom: 6 }}>

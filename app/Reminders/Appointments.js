@@ -1,0 +1,600 @@
+import { ThemedText } from '@/components/ThemedText';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Linking,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import RNCalendarEvents from 'react-native-calendar-events';
+
+const { width } = Dimensions.get('window');
+const TIME_COL_WIDTH = 50;
+const DAY_COL_WIDTH = (width - TIME_COL_WIDTH) / 7;
+const DAY_ITEM_WIDTH = DAY_COL_WIDTH;
+const HOUR_HEIGHT = 100;
+const HEADER_HEIGHT = 40;
+
+export default function Appointments() {
+  const handleBack = () => router.back();
+
+  const uiFontFamily = Platform.select({ ios: 'AtkinsonHyperlegible', android: 'AtkinsonHyperlegible', default: undefined });
+
+  const [currentDate, setCurrentDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay());
+    return d;
+  });
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState(null);
+  const scrollViewRef = useRef(null);
+  const gridHorizontalScrollRef = useRef(null);
+  const scrollingSource = useRef(null);
+
+  // Check permission status on mount and when screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      checkAndFetchEvents();
+    }, [visibleMonth])
+  );
+
+  useEffect(() => {
+    if (scrollViewRef.current) {
+      setTimeout(() => {
+        scrollViewRef.current.scrollTo({ y: 8 * HOUR_HEIGHT, animated: false });
+      }, 100);
+    }
+  }, []);
+
+  const checkAndFetchEvents = async () => {
+    try {
+      // First check current permission status
+      const status = await RNCalendarEvents.checkPermissions();
+      console.log('Current permission status:', status);
+      setPermissionStatus(status);
+
+      if (status === 'authorized') {
+        // Permission already granted, fetch events
+        await fetchEvents();
+      } else if (status === 'denied') {
+        // Permission was explicitly denied, show alert to go to settings
+        showPermissionDeniedAlert();
+      } else if (status === 'restricted') {
+        // Permission was explicitly denied, show alert to go to settings
+        showPermissionDeniedAlert();
+      } else {
+        // Permission not determined yet, request it
+        await requestPermissionAndFetch();
+      }
+    } catch (e) {
+      console.log('Error checking permissions', e);
+      setLoading(false);
+    }
+  };
+
+  const requestPermissionAndFetch = async () => {
+    try {
+      const permission = await RNCalendarEvents.requestPermissions();
+      console.log('Permission request result:', permission);
+      setPermissionStatus(permission);
+
+      if (permission === 'authorized') {
+        await fetchEvents();
+      } else {
+        showPermissionDeniedAlert();
+      }
+    } catch (e) {
+      console.log('Error requesting permissions', e);
+      setLoading(false);
+    }
+  };
+
+  const showPermissionDeniedAlert = () => {
+    Alert.alert(
+      'Calendar Permission Required',
+      'This app needs access to your calendar to display appointments. Please enable calendar access in your device settings.',
+      [
+        { text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => router.back()
+        },
+        { 
+          text: 'Open Settings', 
+          onPress: () => Linking.openSettings() 
+        },
+      ]
+    );
+  };
+
+  const fetchEvents = async () => {
+    console.log('Fetching calendar events...');
+    setLoading(true);
+    try {
+      const startOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+      const endOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+
+      const allEvents = await RNCalendarEvents.fetchAllEvents(
+        startOfMonth.toISOString(),
+        endOfMonth.toISOString()
+      );
+      console.log(`Fetched ${allEvents.length} events`);
+      setEvents(allEvents);
+    } catch (e) {
+      console.log('Error fetching events', e);
+      Alert.alert(
+        'Error',
+        'Failed to fetch calendar events. Please try again.',
+        [
+          { text: 'OK' },
+          { text: 'Retry', onPress: () => checkAndFetchEvents() }
+        ]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+
+  const getMonthDays = (date) => {
+    const days = [];
+    const d = new Date(date.getFullYear(), date.getMonth(), 1);
+    const month = d.getMonth();
+    while (d.getMonth() === month) {
+      days.push(new Date(d));
+      d.setDate(d.getDate() + 1);
+    }
+    return days;
+  };
+
+  const monthDays = getMonthDays(visibleMonth || new Date());
+  const monthScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!monthScrollRef.current) return;
+    const index = monthDays.findIndex(d => isSelected(d) || isToday(d));
+    if (index >= 0) {
+      const x = index * DAY_ITEM_WIDTH - (width / 2) + (DAY_ITEM_WIDTH / 2);
+      monthScrollRef.current.scrollTo({ x: Math.max(0, x), animated: false });
+      setTimeout(() => {
+        gridHorizontalScrollRef.current?.scrollTo({ x: Math.max(0, x), animated: false });
+      }, 50);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!scrollViewRef.current) return;
+    const dayEvents = events.filter(e => {
+      const eStart = new Date(e.startDate);
+      return eStart.getDate() === selectedDate.getDate() &&
+        eStart.getMonth() === selectedDate.getMonth() &&
+        eStart.getFullYear() === selectedDate.getFullYear() &&
+        !e.allDay;
+    });
+
+    if (dayEvents.length > 0) {
+      const earliest = dayEvents.reduce((min, e) => {
+        return new Date(e.startDate) < new Date(min.startDate) ? e : min;
+      }, dayEvents[0]);
+      const s = new Date(earliest.startDate);
+      const top = (s.getHours() * HOUR_HEIGHT) + ((s.getMinutes() / 60) * HOUR_HEIGHT);
+      const offset = Math.max(0, top - HOUR_HEIGHT);
+      scrollViewRef.current.scrollTo({ y: offset, animated: true });
+    } else {
+      scrollViewRef.current.scrollTo({ y: 8 * HOUR_HEIGHT, animated: false });
+    }
+  }, [events, selectedDate]);
+
+  const setCurrentDateToWeekContaining = (date) => {
+    const newDate = new Date(date);
+    newDate.setDate(newDate.getDate() - newDate.getDay());
+    setCurrentDate(newDate);
+    setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+  };
+
+  useEffect(() => {
+    if (selectedDate) {
+      setCurrentDateToWeekContaining(selectedDate);
+    }
+  }, [selectedDate]);
+
+  const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  };
+
+  const isSelected = (date) => {
+    return date.getDate() === selectedDate.getDate() &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear();
+  };
+
+  const changeMonth = (offset) => {
+    const newDate = new Date(visibleMonth);
+    newDate.setDate(1);
+    newDate.setMonth(newDate.getMonth() + offset);
+    setVisibleMonth(newDate);
+    setCurrentDate(newDate);
+  };
+
+  const onHeaderScroll = (event) => {
+    if (scrollingSource.current === 'grid') return;
+    scrollingSource.current = 'header';
+    const x = event.nativeEvent.contentOffset.x;
+    gridHorizontalScrollRef.current?.scrollTo({ x, animated: false });
+  };
+
+  const onGridScroll = (event) => {
+    if (scrollingSource.current === 'header') return;
+    scrollingSource.current = 'grid';
+    const x = event.nativeEvent.contentOffset.x;
+    monthScrollRef.current?.scrollTo({ x, animated: false });
+  };
+
+  const renderEventsForDay = (day) => {
+    const dayEvents = events.filter(e => {
+      const eStart = new Date(e.startDate);
+      return eStart.getDate() === day.getDate() &&
+             eStart.getMonth() === day.getMonth() &&
+             eStart.getFullYear() === day.getFullYear() &&
+             !e.allDay;
+    });
+
+    return dayEvents.map((event, index) => {
+      const start = new Date(event.startDate);
+      const end = new Date(event.endDate);
+      const startHours = start.getHours();
+      const startMinutes = start.getMinutes();
+      const top = (startHours * HOUR_HEIGHT) + ((startMinutes / 60) * HOUR_HEIGHT);
+      let duration = (end - start) / (1000 * 60);
+      if (duration < 30) duration = 30;
+      const height = (duration / 60) * HOUR_HEIGHT;
+
+      return (
+        <View
+          key={index}
+          style={[
+            styles.eventCard,
+            {
+              top,
+              height: height - 2,
+              backgroundColor: event.calendar?.color || '#3b82f6',
+            }
+          ]}
+        >
+          <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+        </View>
+      );
+    });
+  };
+
+  const monthLabel = visibleMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // Empty calendar message when no events
+  const renderEmptyCalendar = () => {
+    if (events.length === 0 && !loading && permissionStatus === 'authorized') {
+      return (
+        <View style={styles.emptyMessage}>
+          <Ionicons name="calendar-outline" size={48} color="#9ca3af" />
+          <Text style={styles.emptyMessageText}>No events for this month</Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton} accessibilityLabel="Back">
+            <Ionicons name='arrow-back' size={24} color="#10b981" />
+          </TouchableOpacity>
+          <ThemedText type="title" style={[styles.headerTitle, { fontFamily: uiFontFamily }]}>Appointments</ThemedText>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={styles.content}>
+          <View style={styles.monthNavigation}>
+            <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.navButton}>
+              <Ionicons name="chevron-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <ThemedText type="subtitle" style={[styles.monthLabel, { fontFamily: uiFontFamily }]}>{monthLabel}</ThemedText>
+            <TouchableOpacity onPress={() => changeMonth(1)} style={styles.navButton}>
+              <Ionicons name="chevron-forward" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.monthDaysWrapper}>
+            <ScrollView
+              ref={monthScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.monthDaysScroll}
+              onScroll={onHeaderScroll}
+              scrollEventThrottle={16}
+              onScrollBeginDrag={() => { scrollingSource.current = 'header'; }}
+            >
+              {monthDays.map((day, idx) => {
+                const selected = isSelected(day);
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.dayItem, selected && styles.dayItemSelected]}
+                    onPress={() => { setSelectedDate(day); setCurrentDateToWeekContaining(day); }}
+                  >
+                    <Text style={[styles.dayItemWeekday, selected && styles.dayItemWeekdaySelected]}>
+                      {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                    </Text>
+                    <View style={[styles.dayNumberContainer, isToday(day) && styles.todayCircle, selected && !isToday(day) && styles.selectedCircle]}>
+                      <Text style={[styles.dayNumber, isToday(day) && styles.todayText, selected && !isToday(day) && styles.selectedDayNumberText]}>{day.getDate()}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <ScrollView ref={scrollViewRef} style={styles.gridScrollView} contentContainerStyle={styles.gridContent}>
+            <View style={styles.gridContainer}>
+              <View style={styles.timeColumn}>
+                <View style={{ height: HEADER_HEIGHT }} />
+                {hours.map((hour) => (
+                  <View key={hour} style={styles.timeLabelContainer}>
+                    <Text style={styles.timeLabel}>
+                      {hour === 0 ? '' : hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              <ScrollView
+                ref={gridHorizontalScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ flex: 1 }}
+                onScroll={onGridScroll}
+                scrollEventThrottle={16}
+                onScrollBeginDrag={() => { scrollingSource.current = 'grid'; }}
+              >
+                {monthDays.map((day, dayIndex) => (
+                  <View key={dayIndex} style={styles.dayColumn}>
+                    <View style={{ height: HEADER_HEIGHT }} />
+                    <View style={{ position: 'relative' }}>
+                      {hours.map((hour) => (
+                        <View key={hour} style={styles.gridCell} />
+                      ))}
+                      {renderEventsForDay(day)}
+                      {isToday(day) && (
+                        <View
+                          style={[
+                            styles.currentTimeLine,
+                            { top: (new Date().getHours() * HOUR_HEIGHT) + ((new Date().getMinutes() / 60) * HOUR_HEIGHT) }
+                          ]}
+                        >
+                          <View style={styles.currentTimeDot} />
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </ScrollView>
+
+          {renderEmptyCalendar()}
+
+          {loading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#10b981" />
+            </View>
+          )}
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  header: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e5e5e5',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  content: {
+    flex: 1,
+  },
+  monthNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  monthLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginHorizontal: 16,
+    color: '#111827',
+  },
+  navButton: {
+    padding: 4,
+  },
+  dayNumberContainer: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todayCircle: {
+    backgroundColor: '#1a73e8',
+  },
+  dayNumber: {
+    fontSize: 16,
+    color: '#333',
+  },
+  todayText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  selectedCircle: {
+    backgroundColor: '#e0f2fe',
+  },
+  selectedDayNumberText: {
+    color: '#1a73e8',
+    fontWeight: '600',
+  },
+  monthDaysWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+    backgroundColor: '#fff',
+  },
+  monthDaysScroll: {
+    paddingLeft: TIME_COL_WIDTH,
+    paddingRight: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  dayItem: {
+    width: DAY_ITEM_WIDTH,
+    alignItems: 'center',
+    marginHorizontal: 0,
+  },
+  dayItemSelected: {},
+  dayItemWeekday: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 6,
+  },
+  dayItemWeekdaySelected: {
+    color: '#1a73e8',
+    fontWeight: '600',
+  },
+  gridScrollView: {
+    flex: 1,
+  },
+  gridContent: {
+    paddingBottom: 40,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+  },
+  timeColumn: {
+    width: TIME_COL_WIDTH,
+  },
+  timeLabelContainer: {
+    height: HOUR_HEIGHT,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  timeLabel: {
+    fontSize: 10,
+    color: '#666',
+    transform: [{ translateY: -6 }],
+  },
+  dayColumn: {
+    width: DAY_COL_WIDTH,
+    borderLeftWidth: 1,
+    borderLeftColor: '#f0f0f0',
+  },
+  gridCell: {
+    height: HOUR_HEIGHT,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  eventCard: {
+    position: 'absolute',
+    left: 2,
+    right: 2,
+    borderRadius: 6,
+    padding: 4,
+    overflow: 'hidden',
+  },
+  eventTitle: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  currentTimeLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#000000',
+    zIndex: 10,
+  },
+  currentTimeDot: {
+    position: 'absolute',
+    left: -4,
+    top: -3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#000000',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyMessage: {
+    position: 'absolute',
+    top: '40%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyMessageText: {
+    fontSize: 16,
+    color: '#9ca3af',
+    marginTop: 12,
+  },
+});

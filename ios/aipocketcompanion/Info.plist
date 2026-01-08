@@ -88,6 +88,12 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>PoCo uses speech recognition to enable voice conversations with the AI bot.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>PoCo accesses your photo library to let you select and share photos.</string>
+	<string>PoCo accesses your photo library to let you select and fetch info from the image.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>PoCo accesses your camera to let you capture photo and fetch info from the imge.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>Allow $(PRODUCT_NAME) to access your calendar</string>
+  <key>NSRemindersUsageDescription</key>
+  <string>Allow $(PRODUCT_NAME) to access your reminders</string>
 </dict>
 </plist>

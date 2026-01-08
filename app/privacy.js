@@ -1,8 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PrivacyPolicyScreen() {
   return (
@@ -73,7 +72,7 @@ export default function PrivacyPolicyScreen() {
           <Text style={styles.text}>
             If you have any questions about this Privacy Policy, please contact us at:
           </Text>
-          <Text style={styles.contact}>support@poco.ai</Text>
+          <Text style={styles.contact}>lata@hellopoco.app</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

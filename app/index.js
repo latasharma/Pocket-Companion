@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Alert,
-  SafeAreaView,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { supabase } from '../lib/supabase';
 
 export default function HomeScreen() {
@@ -59,6 +59,10 @@ export default function HomeScreen() {
     router.push('/chat');
   };
 
+  const handleOpenReminders = () => {
+    router.push('/Reminders/ShowReminderOptionsScreen');
+  };
+
   const handleProfileSettings = () => {
     router.push('/profile');
   };
@@ -106,11 +110,10 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
-      <View style={styles.content}>
+      <View style={styles.contentContainer}>
         <View style={styles.avatarSection}>
-        <Image
-          source={require('../assets/poco-avatar.png')}
+          <Image
+            source={require('../assets/poco-avatar.png')}
             style={styles.avatar}
           />
           <Text style={styles.userName}>
@@ -130,7 +133,21 @@ export default function HomeScreen() {
               <Text style={styles.optionTitle}>Start Chatting</Text>
               <Text style={styles.optionDescription}>
                 Chat with {userProfile?.companion_name || 'Pixel'} about anything
-        </Text>
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
+          </TouchableOpacity>
+
+          {/* Inserted: Reminder option between the two existing options */}
+          <TouchableOpacity style={styles.optionCard} onPress={handleOpenReminders}>
+            <View style={styles.optionIcon}>
+              <Ionicons name="notifications-outline" size={32} color="#10b981" />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={styles.optionTitle}>Reminder</Text>
+              <Text style={styles.optionDescription}>
+                Manage medication, appointments, and important dates
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
           </TouchableOpacity>
@@ -147,12 +164,6 @@ export default function HomeScreen() {
             </View>
             <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Your AI companion is ready to help!
-          </Text>
         </View>
       </View>
     </SafeAreaView>
@@ -189,20 +200,21 @@ const styles = StyleSheet.create({
   signOutButton: {
     padding: 8,
   },
-  content: {
-    flex: 1,
+  contentContainer: {
+    flexGrow: 1,
     paddingHorizontal: 20,
+    paddingBottom: 30,
   },
   avatarSection: {
     alignItems: 'center',
     marginTop: 20,
-    marginBottom: 40,
+    marginBottom: 24,
   },
   avatar: {
-    width: 300,
-    height: 300,
+    width: 240,
+    height: 240,
     resizeMode: 'contain',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   userName: {
     fontSize: 24,
@@ -219,7 +231,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   optionsContainer: {
-    flex: 1,
+    // let content size naturally; ScrollView will handle overflow
   },
   optionCard: {
     backgroundColor: '#ffffff',
