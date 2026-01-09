@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  SafeAreaView,
-  ScrollView,
-  Image,
-  Keyboard,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { supabase } from '../lib/supabase';
 
 const SUGGESTED_NAMES = ['Echo', 'Nova', 'Aura', 'Pixel', 'Luna', 'Zen', 'Spark', 'Mira'];
@@ -21,6 +24,10 @@ export default function OnboardingScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [companionName, setCompanionName] = useState('');
+  const [caregiverName, setCaregiverName] = useState('');
+  const [caregiverPhone, setCaregiverPhone] = useState('');
+  const [caregiverEmail, setCaregiverEmail] = useState('');
+  const [isCaregiverEnabled, setIsCaregiverEnabled] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -81,6 +88,9 @@ export default function OnboardingScreen() {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           companion_name: companionName.trim(),
+          caregiver_name: isCaregiverEnabled ? (caregiverName.trim() || null) : null,
+          caregiver_phone: isCaregiverEnabled ? (caregiverPhone.trim() || null) : null,
+          caregiver_email: isCaregiverEnabled ? (caregiverEmail.trim() || null) : null,
           created_at: new Date().toISOString(),
         });
 
@@ -98,10 +108,15 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
         <Image 
@@ -177,8 +192,62 @@ export default function OnboardingScreen() {
               ))}
             </View>
           </View>
-
+          
           <Text style={styles.hint}>You can change this later in the settings.</Text>
+
+          <Text style={[styles.label, { marginTop: 8 }]}>Caregiver Information</Text>
+          
+          <View style={[styles.acceptanceContainer, { marginBottom: 16, justifyContent: 'space-between' }]}>
+            <Text style={[styles.escalateText]}>Escalate to caregiver if I don’t confirm this dose</Text>
+            <Switch
+              value={isCaregiverEnabled}
+              onValueChange={setIsCaregiverEnabled}
+              trackColor={{ false: '#d1d5db', true: '#10b981' }}
+              thumbColor={'#ffffff'}
+            />
+          </View>
+
+          {isCaregiverEnabled && (
+            <View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Caregiver Name</Text>
+            <TextInput
+              value={caregiverName}
+              onChangeText={setCaregiverName}
+              placeholder="Enter caregiver's name"
+              placeholderTextColor="#9ca3af"
+              style={styles.input}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Caregiver Phone</Text>
+            <TextInput
+              value={caregiverPhone}
+              onChangeText={setCaregiverPhone}
+              placeholder="Enter caregiver's phone"
+              placeholderTextColor="#9ca3af"
+              style={styles.input}
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Caregiver Email</Text>
+            <TextInput
+              value={caregiverEmail}
+              onChangeText={setCaregiverEmail}
+              placeholder="Enter caregiver's email"
+              placeholderTextColor="#9ca3af"
+              style={styles.input}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+            </View>
+          )}
 
           <View style={styles.disclaimer}>
             <Text style={styles.disclaimerTitle}>⚠️ Important Disclaimer</Text>
@@ -221,6 +290,7 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -383,6 +453,11 @@ const styles = StyleSheet.create({
   acceptanceText: {
     fontSize: 14,
     color: '#374151',
+    flex: 1,
+  },
+  escalateText:{
+    fontSize: 14,
+    color: '#ef4444',
     flex: 1,
   },
   linkText: {

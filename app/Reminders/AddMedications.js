@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -13,6 +13,7 @@ export default function AddMedicationsScreen() {
   const params = useLocalSearchParams();
   const isEditing = !!params.id;
 
+  const scrollViewRef = useRef(null);
   const background = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
 
@@ -104,6 +105,13 @@ export default function AddMedicationsScreen() {
     return { nameChecked: false, dosageChecked: false, instructionsChecked: false };
   });
 
+  // Task 4.4.1: Critical Medication Toggle state
+  const [isCritical, setIsCritical] = useState(params.is_critical === 'true');
+  const [caregiverName, setCaregiverName] = useState(params.caregiver_name || '');
+  const [caregiverPhone, setCaregiverPhone] = useState(params.caregiver_phone || '');
+  const [caregiverEmail, setCaregiverEmail] = useState(params.caregiver_email || '');
+  const [caregiverConsent, setCaregiverConsent] = useState(params.caregiver_consent === 'true');
+
   const [saving, setSaving] = useState(false);
 
   const timeOptions = [
@@ -126,6 +134,17 @@ export default function AddMedicationsScreen() {
       return;
     }
 
+    if (isCritical) {
+      if (!caregiverName.trim() || !caregiverPhone.trim() || !caregiverEmail.trim()) {
+        Alert.alert('Validation', 'Please provide Caregiver Name, Phone, and Email for critical escalation.');
+        return;
+      }
+      if (!caregiverConsent) {
+        Alert.alert('Validation', 'You must consent to share alerts with the caregiver.');
+        return;
+      }
+    }
+
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -140,6 +159,11 @@ export default function AddMedicationsScreen() {
         times: (times && times.length > 0) ? JSON.stringify(times) : null,
         notes: notes.trim() || null,
         verification: JSON.stringify(verification),
+        is_critical: isCritical,
+        caregiver_name: isCritical ? caregiverName.trim() : null,
+        caregiver_phone: isCritical ? caregiverPhone.trim() : null,
+        caregiver_email: isCritical ? caregiverEmail.trim() : null,
+        caregiver_consent: isCritical ? caregiverConsent : false,
       };
 
       let error;
@@ -179,7 +203,17 @@ export default function AddMedicationsScreen() {
           <View style={styles.appBarRight} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }} 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        >
+        <ScrollView 
+          ref={scrollViewRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.content} 
+          keyboardShouldPersistTaps="handled"
+        >
           <ThemedText type="subtitle" style={[styles.sectionTitle, { fontFamily: uiFontFamily, color: textColor }]}>Medicine Details</ThemedText>
 
           <View style={styles.field}>
@@ -300,22 +334,76 @@ export default function AddMedicationsScreen() {
               </View>
               <ThemedText style={[styles.checkLabel, { fontFamily: uiFontFamily }]}>Read and understood instructions</ThemedText>
             </TouchableOpacity>
+
+            {/* Task 4.4.1: Critical Medication Toggle */}
+            <TouchableOpacity style={styles.checkItem} onPress={() => setIsCritical(!isCritical)} accessibilityRole="button">
+              <View style={[styles.checkbox, isCritical ? { backgroundColor: "#ef4444", borderColor: "#ef4444" } : { borderColor: '#d1d5db' }]}>
+                {isCritical ? <Ionicons name="checkmark" size={16} color="#fff" /> : null}
+              </View>
+              <ThemedText style={[styles.checkLabel, { fontFamily: uiFontFamily, color: '#ef4444', fontWeight: '600' }]}>
+                Escalate to caregiver if I don’t confirm this dose
+              </ThemedText>
+            </TouchableOpacity>
+
+            {isCritical && (
+              <View style={{ marginTop: 8, paddingLeft: 4, paddingRight: 4 }}>
+                <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily, fontSize: 14 }]}>Caregiver Name</ThemedText>
+                <TextInput
+                  value={caregiverName}
+                  onChangeText={setCaregiverName}
+                  style={[styles.input, { fontFamily: uiFontFamily, color: textColor, borderColor: '#e5e7eb', marginBottom: 10, fontSize: 16, padding: 10 }]}
+                  placeholder="e.g. Jane Doe"
+                  placeholderTextColor="#9ca3af"
+                />
+                <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily, fontSize: 14 }]}>Caregiver Phone</ThemedText>
+                <TextInput
+                  value={caregiverPhone}
+                  onChangeText={setCaregiverPhone}
+                  style={[styles.input, { fontFamily: uiFontFamily, color: textColor, borderColor: '#e5e7eb', marginBottom: 10, fontSize: 16, padding: 10 }]}
+                  placeholder="e.g. +1234567890"
+                  keyboardType="phone-pad"
+                  placeholderTextColor="#9ca3af"
+                />
+                <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily, fontSize: 14 }]}>Caregiver Email</ThemedText>
+                <TextInput
+                  value={caregiverEmail}
+                  onChangeText={setCaregiverEmail}
+                  style={[styles.input, { fontFamily: uiFontFamily, color: textColor, borderColor: '#e5e7eb', marginBottom: 10, fontSize: 16, padding: 10 }]}
+                  placeholder="e.g. jane@example.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholderTextColor="#9ca3af"
+                  onFocus={() => {
+                    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 200);
+                  }}
+                />
+                <TouchableOpacity style={[styles.checkItem, { paddingVertical: 4 }]} onPress={() => setCaregiverConsent(!caregiverConsent)}>
+                  <View style={[styles.checkbox, caregiverConsent ? { backgroundColor: "#10b981" } : { borderColor: '#d1d5db' }]}>
+                    {caregiverConsent ? <Ionicons name="checkmark" size={16} color="#fff" /> : null}
+                  </View>
+                  <ThemedText style={[styles.checkLabel, { fontFamily: uiFontFamily, fontSize: 14, flex: 1 }]}>
+                    I consent to sharing alerts with this caregiver.
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           <View style={{ height: 24 }} />
-        </ScrollView>
 
-        {/* Single action button at the bottom */}
-        <View style={styles.footer}> 
-          <TouchableOpacity
-            style={[styles.saveButton, { backgroundColor: "#10b981" }]}
-            onPress={saveMedicine}
-            accessibilityLabel="Save Medicine"
-            disabled={saving}
-          >
-            <ThemedText type="defaultSemiBold" style={[styles.saveText, { fontFamily: uiFontFamily, color: '#fff' }]}>{saving ? 'Saving…' : (isEditing ? 'Update Medicine' : 'Save Medicine')}</ThemedText>
-          </TouchableOpacity>
-        </View>
+          {/* Single action button at the bottom */}
+          <View style={[styles.footer, { paddingHorizontal: 0 }]}> 
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: "#10b981" }]}
+              onPress={saveMedicine}
+              accessibilityLabel="Save Medicine"
+              disabled={saving}
+            >
+              <ThemedText type="defaultSemiBold" style={[styles.saveText, { fontFamily: uiFontFamily, color: '#fff' }]}>{saving ? 'Saving…' : (isEditing ? 'Update Medicine' : 'Save Medicine')}</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+        </KeyboardAvoidingView>
       </ThemedView>
     </SafeAreaView>
   );
@@ -334,7 +422,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
 },
-  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 60 },
   referenceImage: { width: '100%', height: 180, resizeMode: 'contain', marginBottom: 12 },
   sectionTitle: { marginBottom: 10, paddingHorizontal: 2 },
   field: { marginBottom: 12 },

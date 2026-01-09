@@ -193,6 +193,113 @@ Use the existing `times` JSON array to store selected values, including `"07:00"
 
 ---
 
+### 4.3 Medication Reminder Confirmation Flow (Must-have)
+
+When a medication reminder is triggered:
+
+1. Show a push notification with clear actions:
+   - **Taken**
+   - **Snooze**
+   - **Skip**
+
+2. If the user opens the reminder screen:
+   - Show medication name
+   - Show dosage
+   - Show scheduled time
+   - Provide large, easy-to-tap buttons:
+     * Taken
+     * Skipped
+     * Snooze (5 / 10 / 15 / 30 / 60 minutes)
+
+3. Reminder status states:
+   - Due (Pending)
+   - Taken
+   - Missed (Unconfirmed)
+---
+
+### 4.4 Medication Reminder Escalation (NEW)
+
+This section extends the existing medication reminder logic to ensure **critical medications are not silently missed**.
+
+#### Purpose
+If a user does not confirm a medication reminder within a defined time window, the app escalates the reminder using stronger alerts and optional caregiver notifications.
+
+---
+
+#### 4.4.1 Critical Medication Toggle
+
+**Location**: Add / Edit Medication screen
+
+- Keep the existing design of the screen as it is. Make sure that it does not break.
+- In the "Verification Checklist" add one more checkbox with an option: "Escalate to caregiver if I don’t confirm this dose". It should look same as other option only the text colour should be different.
+
+If selected:
+- Caregiver contact details must be present with Caregiver Name, Phone Number, Email input field.
+- Explicit consent is required
+
+---
+
+#### 4.4.2 Escalation Timing Rules (v1)
+
+| Stage | Time Since Due | Action |
+|-----|---------------|-------|
+| T0 | At scheduled time | Normal reminder |
+| T+10 min | Not confirmed | Reminder retry |
+| T+30 min | Still not confirmed | Final reminder |
+| T+60 min | Still not confirmed + Critical | Escalate to caregiver |
+
+---
+
+#### 4.4.3 Conditions to Escalate
+
+Escalation occurs **only if ALL are true**:
+
+1. Dose status is **pending**
+2. Medication is marked as **Critical**
+3. Confirmation window has expired (≥ 60 minutes)
+4. Caregiver contact exists
+5. Caregiver consent is given
+6. Caregiver has **not already been notified**
+
+---
+
+#### 4.4.4 When NOT to Escalate
+
+- Medication is not marked as Critical
+- User confirms Taken / Skipped before escalation
+- Caregiver consent is missing
+- Caregiver was already notified for this dose
+
+---
+
+#### 4.4.5 Caregiver Notification (Privacy-First)
+
+Default channels:
+- SMS
+- Email
+
+Message format (no medication details by default):
+
+PoCo Alert:
+The user has not confirmed a scheduled medication reminder.
+Please check in with them.
+
+Medication name or dosage must **never be shared** unless explicitly enabled in a future version.
+
+---
+
+#### 4.4.6 Escalation Job (Background Logic)
+
+Runs every **1–5 minutes**:
+
+1. Fetch unconfirmed dose events
+2. Check escalation eligibility
+3. Send caregiver notification
+4. Mark caregiver_notified_at
+5. Ensure idempotency (no duplicate alerts)
+
+---
+
 ## 5. Appointments Screen
 
 ### 5.1 Overview Page Layout
