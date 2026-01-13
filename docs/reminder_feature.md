@@ -199,7 +199,6 @@ When a medication reminder is triggered:
 
 1. Show a push notification with clear actions:
    - **Taken**
-   - **Snooze**
    - **Skip**
 
 2. If the user opens the reminder screen:
@@ -209,7 +208,6 @@ When a medication reminder is triggered:
    - Provide large, easy-to-tap buttons:
      * Taken
      * Skipped
-     * Snooze (5 / 10 / 15 / 30 / 60 minutes)
 
 3. Reminder status states:
    - Due (Pending)

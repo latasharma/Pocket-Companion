@@ -1,13 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MedicationReminderService } from './MedicationReminderService';
 
 /**
  * MedicationReminderScreen
  * 
  * Implements Task 4.3: Medication Reminder Confirmation Flow.
- * Displays medication details and allows the user to Take, Snooze, or Skip.
+ * Displays medication details and allows the user to Take or Skip.
  * Any action stops the escalation logic.
  */
 export default function MedicationReminderScreen() {
@@ -15,7 +15,6 @@ export default function MedicationReminderScreen() {
   // Expecting params passed from the notification or navigation
   const { reminderId, medicationName, dosage, scheduledTime } = useLocalSearchParams();
   
-  const [snoozeModalVisible, setSnoozeModalVisible] = useState(false);
   const [processing, setProcessing] = useState(false);
 
   const handleTaken = async () => {
@@ -56,20 +55,6 @@ export default function MedicationReminderScreen() {
     );
   };
 
-  const handleSnooze = async (minutes) => {
-    setSnoozeModalVisible(false);
-    setProcessing(true);
-    try {
-      await MedicationReminderService.snoozeReminder(reminderId, minutes, { medicationName, dosage });
-      Alert.alert("Snoozed", `Reminder snoozed for ${minutes} minutes.`);
-      router.back();
-    } catch (error) {
-      Alert.alert("Error", "Could not snooze reminder.");
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -91,15 +76,6 @@ export default function MedicationReminderScreen() {
             <Text style={styles.buttonText}>Taken</Text>
           </TouchableOpacity>
 
-          {/* Snooze Button - Secondary Action */}
-          <TouchableOpacity 
-            style={[styles.button, styles.snoozeButton]} 
-            onPress={() => setSnoozeModalVisible(true)}
-            disabled={processing}
-          >
-            <Text style={[styles.buttonText, styles.darkText]}>Snooze</Text>
-          </TouchableOpacity>
-
           {/* Skip Button - Tertiary Action */}
           <TouchableOpacity 
             style={[styles.button, styles.skipButton]} 
@@ -111,34 +87,6 @@ export default function MedicationReminderScreen() {
         </View>
       </ScrollView>
 
-      {/* Snooze Options Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={snoozeModalVisible}
-        onRequestClose={() => setSnoozeModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Snooze for...</Text>
-            {[5, 10, 15, 30, 60].map((min) => (
-              <TouchableOpacity 
-                key={min} 
-                style={styles.modalOption} 
-                onPress={() => handleSnooze(min)}
-              >
-                <Text style={styles.modalOptionText}>{min} Minutes</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity 
-              style={[styles.modalOption, styles.modalCancel]} 
-              onPress={() => setSnoozeModalVisible(false)}
-            >
-              <Text style={styles.modalOptionText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -198,9 +146,6 @@ const styles = StyleSheet.create({
   },
   takenButton: {
     backgroundColor: '#27AE60', // Green
-  },
-  snoozeButton: {
-    backgroundColor: '#F1C40F', // Yellow
   },
   skipButton: {
     backgroundColor: '#E74C3C', // Red

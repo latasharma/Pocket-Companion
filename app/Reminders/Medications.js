@@ -14,6 +14,7 @@ import { requestNotificationPermission, scheduleNotification } from '../../lib/N
 
 export default function MedicationsScreen() {
   const router = useRouter();
+  const [user, setUser] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,11 +51,13 @@ export default function MedicationsScreen() {
   useFocusEffect(
     useCallback(() => {
       requestNotificationPermission();
-      fetchMedications();
+      fetchUserAndMedications();
     }, [])
   );
 
   useEffect(() => {
+    if (!user) return;
+
     medications.forEach((med) => {
       // Support multiple times (times JSON) or legacy `time` string
       const times = (() => {
@@ -80,32 +83,87 @@ export default function MedicationsScreen() {
         // If time already passed today → schedule tomorrow
         if (date < new Date()) date.setDate(date.getDate() + 1);
 
-        const notificationId = `medication-${med.id}-${t}`;
-        scheduleNotification({
-          id: notificationId,
-          title: 'Medication Reminder',
-          body: `Time to take ${med.name}`,
-          date,
-          type: 'medication',
-          data: {
-            medicationId: med.id,
-            time: t,
-            repeatType: 'daily',
-          },
+        const whenIso = date.toISOString();
+
+        // Create (or reuse) the matching dose_event so server-side escalation can run.
+        createDoseEventIfNeeded({
+          userId: user.id,
+          medicationId: med.id,
+          scheduledAtIso: whenIso
+        }).then((doseEventId) => {
+          const notificationId = `medication-${med.id}-${t}-${doseEventId || 'pending'}`;
+          scheduleNotification({
+            id: notificationId,
+            title: 'Medication Reminder',
+            body: `Time to take ${med.name}`,
+            date,
+            type: 'medication',
+            data: {
+              medicationId: med.id,
+              time: t,
+              repeatType: 'daily',
+              doseEventId: doseEventId || null
+            },
+          });
         });
       });
     });
   }, [medications]);
 
-  const fetchMedications = async () => {
+  const fetchUserAndMedications = async () => {
     try {
-      const { data, error } = await supabase.from('medications').select('*');
+      const { data: auth } = await supabase.auth.getUser();
+      const currentUser = auth?.user;
+      setUser(currentUser);
+
+      if (!currentUser) {
+        setMedications([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('user_id', currentUser.id);
       if (error) throw error;
       setMedications(data || []);
     } catch (err) {
       console.error('Error fetching medications:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createDoseEventIfNeeded = async ({ userId, medicationId, scheduledAtIso }) => {
+    try {
+      const { data: existing, error: findError } = await supabase
+        .from('dose_events')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('medication_id', medicationId)
+        .eq('scheduled_at', scheduledAtIso)
+        .maybeSingle();
+
+      if (findError && findError.code !== 'PGRST116') {
+        console.error('Error checking existing dose_event:', findError);
+      }
+
+      if (existing?.id) return existing.id;
+
+      const { data, error } = await supabase
+        .from('dose_events')
+        .insert([{ user_id: userId, medication_id: medicationId, scheduled_at: scheduledAtIso, status: 'pending' }])
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Error creating dose_event:', error);
+        return null;
+      }
+      return data.id;
+    } catch (err) {
+      console.error('Unexpected dose_event create error:', err);
+      return null;
     }
   };
 

@@ -39,19 +39,16 @@ export const MedicationReminderService = {
   markAsTaken: async (reminderId) => {
     if (!reminderId) return;
 
-    // Update Supabase: Set status to 'Taken' and record timestamp
     const { error } = await supabase
-      .from('medication_logs') // Assuming a logs table exists for instances
+      .from('dose_events')
       .update({ 
-        status: 'Taken', 
+        status: 'taken', 
         confirmed_at: new Date().toISOString(),
-        escalation_stopped: true 
       })
       .eq('id', reminderId);
 
     if (error) throw error;
 
-    // Cancel any pending notifications for this specific reminder ID if necessary
     await Notifications.dismissNotificationAsync(reminderId);
   },
 
@@ -63,11 +60,10 @@ export const MedicationReminderService = {
     if (!reminderId) return;
 
     const { error } = await supabase
-      .from('medication_logs')
+      .from('dose_events')
       .update({ 
-        status: 'Skipped', 
+        status: 'skipped', 
         confirmed_at: new Date().toISOString(),
-        escalation_stopped: true 
       })
       .eq('id', reminderId);
 
@@ -76,39 +72,6 @@ export const MedicationReminderService = {
     await Notifications.dismissNotificationAsync(reminderId);
   },
 
-  /**
-   * Snoozes the reminder for a specific duration.
-   * This updates the log to indicate interaction (stopping immediate escalation)
-   * but schedules a new local notification.
-   */
-  snoozeReminder: async (reminderId, minutes, details) => {
-    // Schedule a new local notification
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Snoozed Medication Reminder",
-        body: `Time to take ${details.medicationName || 'your medication'}.`,
-        data: { reminderId, ...details },
-      },
-      trigger: {
-        seconds: minutes * 60,
-      },
-    });
-
-    // Optionally update backend to reflect "Snoozed" state if tracking is required
-    // For Task 4.3, user action stops *escalation*, so we might want to flag it
-    // or simply reset the escalation timer in the backend logic.
-    // Here we assume updating 'last_interaction' stops the immediate critical alert.
-    const { error } = await supabase
-      .from('medication_logs')
-      .update({ 
-        status: 'Snoozed',
-        last_snoozed_at: new Date().toISOString(),
-        escalation_stopped: true // Task 4.3: Any user action immediately stops further escalation.
-      })
-      .eq('id', reminderId);
-
-    if (error) throw error;
-  },
 
   /**
    * Task 4.4.6: Escalation Job (Background Logic)
@@ -116,68 +79,32 @@ export const MedicationReminderService = {
    * Runs every 1-5 minutes via background fetch.
    */
   checkAndEscalateReminders: async () => {
+    // Keep local retries client-side; caregiver escalation is handled server-side via Edge Function.
     try {
-      // 1. Fetch unconfirmed dose events
-      // Select logs that are 'Pending', escalation not stopped, and caregiver not notified.
       const { data: pendingDoses, error } = await supabase
-        .from('medication_logs')
-        .select(`
-          id,
-          scheduled_time,
-          retry_1_sent,
-          retry_2_sent,
-          medications (
-            name,
-            is_critical,
-            caregiver_contact,
-            caregiver_consent
-          )
-        `)
-        .eq('status', 'Pending')
-        .eq('escalation_stopped', false)
-        .is('caregiver_notified_at', null);
+        .from('dose_events')
+        .select('id, scheduled_at, retry_1_sent_at, retry_2_sent_at')
+        .eq('status', 'pending');
 
       if (error) throw error;
 
       const now = new Date();
 
-      for (const dose of pendingDoses) {
-        const scheduledTime = new Date(dose.scheduled_time);
-        const diffInMinutes = (now - scheduledTime) / (1000 * 60);
+      for (const dose of pendingDoses || []) {
+        const scheduledTime = new Date(dose.scheduled_at);
+        const diffInMinutes = (now.getTime() - scheduledTime.getTime()) / (1000 * 60);
 
-        // Task 4.4.2: Escalation Timing Rules
-        
         // T+10 min: Reminder retry
-        if (diffInMinutes >= 10 && diffInMinutes < 30 && !dose.retry_1_sent) {
+        if (diffInMinutes >= 10 && diffInMinutes < 30 && !dose.retry_1_sent_at) {
           await MedicationReminderService.sendLocalRetry(dose.id, "It's time to take your medication.");
-          await supabase.from('medication_logs').update({ retry_1_sent: true }).eq('id', dose.id);
+          await supabase.from('dose_events').update({ retry_1_sent_at: new Date().toISOString() }).eq('id', dose.id);
         }
         // T+30 min: Final reminder
-        else if (diffInMinutes >= 30 && diffInMinutes < 60 && !dose.retry_2_sent) {
+        else if (diffInMinutes >= 30 && diffInMinutes < 60 && !dose.retry_2_sent_at) {
           await MedicationReminderService.sendLocalRetry(dose.id, "Reminder: Please take your medication.");
-          await supabase.from('medication_logs').update({ retry_2_sent: true }).eq('id', dose.id);
+          await supabase.from('dose_events').update({ retry_2_sent_at: new Date().toISOString() }).eq('id', dose.id);
         }
-        // T+60 min: Escalate to caregiver
-        else if (diffInMinutes >= 60) {
-          // Task 4.4.3: Conditions to Escalate
-          // 1. Dose status is pending (Checked in query)
-          // 2. Medication is marked as Critical
-          // 3. Confirmation window has expired (>= 60 mins)
-          // 4. Caregiver contact exists
-          // 5. Caregiver consent is given
-          // 6. Caregiver has not already been notified (Checked in query)
-
-          const med = dose.medications;
-
-          // Task 4.4.4: When NOT to Escalate
-          // - Medication is not marked as Critical (Checked below)
-          // - User confirms Taken / Skipped before escalation (Checked in query via status/escalation_stopped)
-          // - Caregiver consent is missing (Checked below)
-          // - Caregiver was already notified for this dose (Checked in query)
-          if (med && med.is_critical && med.caregiver_contact && med.caregiver_consent) {
-            await MedicationReminderService.escalateToCaregiver(dose.id, med.caregiver_contact);
-          }
-        }
+        // T+60+ caregiver escalation: handled by server Edge Function.
       }
     } catch (err) {
       console.error("Escalation job failed:", err);
@@ -198,22 +125,9 @@ export const MedicationReminderService = {
   /**
    * Task 4.4.5: Caregiver Notification
    */
-  escalateToCaregiver: async (reminderId, contact) => {
-    // Task 4.4.5: Privacy-First Message
-    const message = "PoCo Alert: The user has not confirmed a scheduled medication reminder. Please check in with them.";
-    
-    // In a real app, invoke a backend function here to send SMS/Email.
-    console.log(`[Escalation] Sending to ${contact}: "${message}"`);
-
-    // Mark as notified to ensure idempotency
-    const { error } = await supabase
-      .from('medication_logs')
-      .update({ 
-        caregiver_notified_at: new Date().toISOString()
-      })
-      .eq('id', reminderId);
-
-    if (error) console.error("Failed to mark caregiver notified", error);
+  escalateToCaregiver: async () => {
+    // Intentionally left empty: caregiver escalation now handled server-side via Edge Function (cron).
+    return;
   },
 
   /**
