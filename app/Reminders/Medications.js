@@ -11,6 +11,8 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { parseMedicationFromOCR, performGeminiVisionOCRFromUrl } from '@/lib/aiService';
 import { supabase } from '@/lib/supabase';
 import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
+import { scheduleSMSConfirmation } from '../../lib/SMSConfirmationService';
+import { Switch } from 'react-native';
 
 export default function MedicationsScreen() {
   const router = useRouter();
@@ -92,19 +94,47 @@ export default function MedicationsScreen() {
           scheduledAtIso: whenIso
         }).then((doseEventId) => {
           const notificationId = `medication-${med.id}-${t}-${doseEventId || 'pending'}`;
-          scheduleNotification({
-            id: notificationId,
-            title: 'Medication Reminder',
-            body: `Time to take ${med.name}`,
-            date,
-            type: 'medication',
-            data: {
-              medicationId: med.id,
-              time: t,
-              repeatType: 'daily',
-              doseEventId: doseEventId || null
-            },
-          });
+          
+          // For critical medications, schedule SMS confirmation instead of notification with buttons
+          if (med.is_critical && doseEventId) {
+            // Schedule notification (reminder only, no action buttons needed)
+            scheduleNotification({
+              id: notificationId,
+              title: 'Critical Medication Reminder',
+              body: `Time to take ${med.name}. You will receive an SMS to confirm.`,
+              date,
+              type: 'medication_critical',
+              data: {
+                medicationId: med.id,
+                time: t,
+                repeatType: 'daily',
+                doseEventId: doseEventId,
+                isCritical: true
+              },
+            });
+
+            // Schedule SMS to be sent at the same time
+            scheduleSMSConfirmation({
+              doseEventId,
+              medicationName: med.name,
+              scheduledAt: date
+            }).catch(err => console.error('Error scheduling SMS:', err));
+          } else {
+            // Regular medication: just notification reminder (no SMS, no escalation)
+            scheduleNotification({
+              id: notificationId,
+              title: 'Medication Reminder',
+              body: `Time to take ${med.name}`,
+              date,
+              type: 'medication',
+              data: {
+                medicationId: med.id,
+                time: t,
+                repeatType: 'daily',
+                doseEventId: doseEventId || null
+              },
+            });
+          }
         });
       });
     });
@@ -363,10 +393,41 @@ export default function MedicationsScreen() {
         name: item.name,
         dosage: item.dosage,
         time: item.time ? item.time.substring(0, 5) : '',
+        times: item.times || '',
         notes: item.notes,
         verification: typeof item.verification === 'object' ? JSON.stringify(item.verification) : item.verification,
+        is_critical: item.is_critical ? 'true' : 'false',
+        caregiver_name: item.caregiver_name || '',
+        caregiver_phone: item.caregiver_phone || '',
+        caregiver_email: item.caregiver_email || '',
+        caregiver_consent: item.caregiver_consent ? 'true' : 'false',
       },
     });
+  };
+
+  const toggleCritical = async (item, nextValue) => {
+    // If enabling, send user to the edit form to fill caregiver details/consent.
+    if (nextValue) {
+      handleEdit({ ...item, is_critical: true });
+    } else {
+      updateCritical(item, false);
+    }
+  };
+
+  const updateCritical = async (item, nextValue) => {
+    try {
+      const { error } = await supabase
+        .from('medications')
+        .update({ is_critical: nextValue })
+        .eq('id', item.id);
+      if (error) throw error;
+      setMedications((prev) =>
+        prev.map((m) => (m.id === item.id ? { ...m, is_critical: nextValue } : m))
+      );
+    } catch (err) {
+      console.error('Failed to toggle critical:', err);
+      Alert.alert('Error', 'Could not update critical setting.');
+    }
   };
 
   const renderMedItem = ({ item }) => (
@@ -374,6 +435,15 @@ export default function MedicationsScreen() {
       <View style={styles.medInfo}>
         <ThemedText style={[styles.medName, { fontFamily: uiFontFamily }]}>{item.name}</ThemedText>
         <ThemedText style={[styles.medDetail, { fontFamily: uiFontFamily }]}>{item.dosage || ''}</ThemedText>
+      </View>
+      <View style={styles.criticalToggle}>
+        <ThemedText style={styles.criticalLabel}>Critical</ThemedText>
+        <Switch
+          value={!!item.is_critical}
+          onValueChange={(v) => toggleCritical(item, v)}
+          thumbColor={item.is_critical ? '#10b981' : '#f3f4f6'}
+          trackColor={{ true: '#a7f3d0', false: '#e5e7eb' }}
+        />
       </View>
       <View style={styles.medActions}>
         <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton} accessibilityLabel="Edit">
@@ -560,6 +630,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
+  },
+  criticalToggle: {
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  criticalLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
   },
   medInfo: { flex: 1 },
   medActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },

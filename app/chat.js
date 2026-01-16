@@ -23,6 +23,7 @@ import { MemoryService } from '../lib/memoryService';
 import { supabase } from '../lib/supabase';
 import { VoiceInputService } from '../lib/voiceInputService';
 import { VoiceService } from '../lib/voiceService';
+import { handleUserInteraction, initializeProactiveCheckIn, getPendingCheckInGreeting } from '../lib/ProactiveCheckinService';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
@@ -54,6 +55,23 @@ export default function ChatScreen() {
         await initializeVoiceService();
         await initializeVoiceInput();
         await initializeDeviceId();
+        
+        // Initialize proactive check-in system
+        await initializeProactiveCheckIn();
+        
+        // Check if there's a pending check-in greeting from notification
+        const pendingGreeting = await getPendingCheckInGreeting();
+        if (pendingGreeting && pendingGreeting !== "Hi! How are you doing?") {
+          // Add PoCo's proactive greeting to the chat
+          const aiGreeting = {
+            id: Date.now(),
+            text: pendingGreeting,
+            sender: 'ai',
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, aiGreeting]);
+          console.log('💬 Added proactive check-in greeting to chat');
+        }
         
         // Set up auth state change listener
         console.log('🔐 Setting up auth listener in useEffect');
@@ -700,6 +718,9 @@ const fetchUserProfile = async () => {
       saveChatHistory(newMessages);
       setInputText('');
       setIsLoading(true);
+
+      // Track user interaction for proactive check-ins
+      handleUserInteraction().catch(err => console.warn('Error tracking interaction:', err));
 
       // Get device ID
       const deviceId = await deviceIdService.getDeviceId();

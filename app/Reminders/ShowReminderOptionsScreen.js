@@ -4,6 +4,7 @@ import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import BottomNav from '../../components/BottomNav';
 
 export default function ShowReminderOptionsScreen() {
   const router = useRouter();
@@ -71,6 +72,7 @@ export default function ShowReminderOptionsScreen() {
           </View>
         </View>
       </ThemedView>
+      <BottomNav />
     </SafeAreaView>
   );
 }
@@ -78,7 +80,7 @@ export default function ShowReminderOptionsScreen() {
 const styles = StyleSheet.create({
   // Match app-wide background used in chat screen
   safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 12 },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 110 },
 
   // App bar styled to mirror /app/chat.js header styles
   appBar: {

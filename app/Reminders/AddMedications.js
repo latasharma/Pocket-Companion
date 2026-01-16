@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -87,7 +87,7 @@ export default function AddMedicationsScreen() {
       return [];
     }
   };
-  const [times, setTimes] = useState(parseTimesParam(params.time));
+  const [times, setTimes] = useState(parseTimesParam(params.times ?? params.time));
   const [notes, setNotes] = useState(initialNotes);
 
   // Track whether fields were auto-populated by OCR so UI can subtly highlight them
@@ -111,10 +111,43 @@ export default function AddMedicationsScreen() {
   const [caregiverPhone, setCaregiverPhone] = useState(params.caregiver_phone || '');
   const [caregiverEmail, setCaregiverEmail] = useState(params.caregiver_email || '');
   const [caregiverConsent, setCaregiverConsent] = useState(params.caregiver_consent === 'true');
+  
+  // User's phone number for SMS confirmations
+  const [userPhone, setUserPhone] = useState(params.user_phone || '');
 
   const [saving, setSaving] = useState(false);
 
+  // Prefill caregiver contact from profile so users don’t re-enter
+  useEffect(() => {
+    const loadCaregiverFromProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('caregiver_name, caregiver_phone, caregiver_email, phone')
+          .eq('id', user.id)
+          .single();
+        if (error) return;
+        if (!caregiverName && data?.caregiver_name) setCaregiverName(data.caregiver_name);
+        if (!caregiverPhone && data?.caregiver_phone) setCaregiverPhone(data.caregiver_phone);
+        if (!caregiverEmail && data?.caregiver_email) setCaregiverEmail(data.caregiver_email);
+        if (!userPhone && data?.phone) setUserPhone(data.phone);
+      } catch (e) {
+        console.error('Error preloading caregiver info:', e);
+      }
+    };
+    loadCaregiverFromProfile();
+  }, []);
+
+  // Get current time + 2 minutes for testing
+  const testTime = new Date();
+  testTime.setMinutes(testTime.getMinutes() + 2);
+  const testTimeStr = `${String(testTime.getHours()).padStart(2, '0')}:${String(testTime.getMinutes()).padStart(2, '0')}`;
+  const testTimeDisplay = testTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
   const timeOptions = [
+    { label: '🧪 TEST (2 min)', value: testTimeStr, display: testTimeDisplay, icon: 'flask-outline' },
     { label: 'Before Breakfast', value: '07:00', display: '07:00 AM', icon: 'sunny-outline' },
     { label: 'After Breakfast', value: '08:00', display: '08:00 AM', icon: 'sunny' },
     { label: 'Lunch', value: '12:30', display: '12:30 PM', icon: 'restaurant-outline' },
@@ -128,6 +161,21 @@ export default function AddMedicationsScreen() {
     setVerification((p) => ({ ...p, [key]: !p[key] }));
   };
 
+  const handleToggleCritical = () => {
+    if (!isCritical) {
+      Alert.alert(
+        'Enable Critical Escalation?',
+        'For critical medications, you will receive an SMS to confirm. Reply TAKEN or SKIP. Your caregiver will be notified if you don\'t respond within 60 minutes.\n\nYou need a phone number for SMS confirmations.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Enable', onPress: () => setIsCritical(true) }
+        ]
+      );
+    } else {
+      setIsCritical(false);
+    }
+  };
+
   const saveMedicine = async () => {
     if (!name.trim()) {
       Alert.alert('Validation', 'Please enter the medicine name.');
@@ -135,6 +183,28 @@ export default function AddMedicationsScreen() {
     }
 
     if (isCritical) {
+      // Validate user has phone number for SMS confirmations
+      if (!userPhone.trim()) {
+        Alert.alert(
+          'Phone Number Required',
+          'Critical medications require SMS confirmation. Please enter your phone number below.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Validate phone number format (basic)
+      const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
+      if (!phoneRegex.test(userPhone.trim())) {
+        Alert.alert(
+          'Invalid Phone Number',
+          'Please enter a valid phone number (e.g., +1234567890)',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Validate caregiver info
       if (!caregiverName.trim() || !caregiverPhone.trim() || !caregiverEmail.trim()) {
         Alert.alert('Validation', 'Please provide Caregiver Name, Phone, and Email for critical escalation.');
         return;
@@ -180,6 +250,25 @@ export default function AddMedicationsScreen() {
         console.error('Supabase insert error:', error);
         Alert.alert('Error', 'Failed to save medication.');
         return;
+      }
+
+      // Persist user phone and caregiver contact to profile for reuse
+      try {
+        const profileUpdate = {
+          id: user.id,
+          caregiver_name: caregiverName?.trim() || null,
+          caregiver_phone: caregiverPhone?.trim() || null,
+          caregiver_email: caregiverEmail?.trim() || null,
+        };
+        
+        // Only update phone if user entered one (don't overwrite with null)
+        if (userPhone?.trim()) {
+          profileUpdate.phone = userPhone.trim();
+        }
+        
+        await supabase.from('profiles').upsert(profileUpdate);
+      } catch (profileErr) {
+        console.error('Warning: failed to update profile', profileErr);
       }
 
       // Navigate back to the medications list
@@ -289,7 +378,7 @@ export default function AddMedicationsScreen() {
                         {option.display}
                       </ThemedText>
                     </View>
-                    {selected ? <View style={styles.timeBadge}><ThemedText style={styles.timeBadgeText}>{idx + 1}</ThemedText></View> : null}
+                    {selected ? <View style={styles.selectedCheckmark}><Ionicons name="checkmark-circle" size={24} color="#10b981" /></View> : null}
                   </TouchableOpacity>
                 );
               })}
@@ -315,29 +404,29 @@ export default function AddMedicationsScreen() {
             <ThemedText type="subtitle" style={[styles.checklistTitle, { fontFamily: uiFontFamily, color: textColor }]}>Verification Checklist</ThemedText>
 
             <TouchableOpacity style={styles.checkItem} onPress={() => toggleVerification('nameChecked')} accessibilityRole="button">
-              <View style={[styles.checkbox, verification.nameChecked ? { backgroundColor: "#10b981" } : { borderColor: '#d1d5db' }]}>
+              <View style={[styles.checkbox, verification.nameChecked ? { backgroundColor: "#10b981" } : { borderColor: '#111827' }]}>
                 {verification.nameChecked ? <Ionicons name="checkmark" size={16} color="#fff" /> : null}
               </View>
               <ThemedText style={[styles.checkLabel, { fontFamily: uiFontFamily }]}>Medicine name is correct</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.checkItem} onPress={() => toggleVerification('dosageChecked')} accessibilityRole="button">
-              <View style={[styles.checkbox, verification.dosageChecked ? { backgroundColor: "#10b981" } : { borderColor: '#d1d5db' }]}>
+              <View style={[styles.checkbox, verification.dosageChecked ? { backgroundColor: "#10b981" } : { borderColor: '#111827' }]}>
                 {verification.dosageChecked ? <Ionicons name="checkmark" size={16} color="#fff" /> : null}
               </View>
               <ThemedText style={[styles.checkLabel, { fontFamily: uiFontFamily }]}>Dosage / strength confirmed</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.checkItem} onPress={() => toggleVerification('instructionsChecked')} accessibilityRole="button">
-              <View style={[styles.checkbox, verification.instructionsChecked ? { backgroundColor: "#10b981" } : { borderColor: '#d1d5db' }]}>
+              <View style={[styles.checkbox, verification.instructionsChecked ? { backgroundColor: "#10b981" } : { borderColor: '#111827' }]}>
                 {verification.instructionsChecked ? <Ionicons name="checkmark" size={16} color="#fff" /> : null}
               </View>
               <ThemedText style={[styles.checkLabel, { fontFamily: uiFontFamily }]}>Read and understood instructions</ThemedText>
             </TouchableOpacity>
 
             {/* Task 4.4.1: Critical Medication Toggle */}
-            <TouchableOpacity style={styles.checkItem} onPress={() => setIsCritical(!isCritical)} accessibilityRole="button">
-              <View style={[styles.checkbox, isCritical ? { backgroundColor: "#ef4444", borderColor: "#ef4444" } : { borderColor: '#d1d5db' }]}>
+            <TouchableOpacity style={styles.checkItem} onPress={handleToggleCritical} accessibilityRole="button">
+              <View style={[styles.checkbox, isCritical ? { backgroundColor: "#ef4444", borderColor: "#ef4444" } : { borderColor: '#111827' }]}>
                 {isCritical ? <Ionicons name="checkmark" size={16} color="#fff" /> : null}
               </View>
               <ThemedText style={[styles.checkLabel, { fontFamily: uiFontFamily, color: '#ef4444', fontWeight: '600' }]}>
@@ -347,6 +436,23 @@ export default function AddMedicationsScreen() {
 
             {isCritical && (
               <View style={{ marginTop: 8, paddingLeft: 4, paddingRight: 4 }}>
+                {/* User Phone Number for SMS Confirmations */}
+                <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily, fontSize: 14, fontWeight: '600', color: '#ef4444' }]}>
+                  Your Phone Number (for SMS confirmations)
+                </ThemedText>
+                <TextInput
+                  value={userPhone}
+                  onChangeText={setUserPhone}
+                  style={[styles.input, { fontFamily: uiFontFamily, color: textColor, borderColor: '#ef4444', borderWidth: 2, marginBottom: 12, fontSize: 16, padding: 10 }]}
+                  placeholder="e.g. +1234567890"
+                  keyboardType="phone-pad"
+                  placeholderTextColor="#9ca3af"
+                />
+                <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily, fontSize: 12, color: '#6b7280', marginBottom: 12 }]}>
+                  You will receive an SMS to confirm this medication. Reply TAKEN or SKIP.
+                </ThemedText>
+
+                {/* Caregiver Contact */}
                 <ThemedText style={[styles.fieldLabel, { fontFamily: uiFontFamily, fontSize: 14 }]}>Caregiver Name</ThemedText>
                 <TextInput
                   value={caregiverName}
@@ -378,13 +484,37 @@ export default function AddMedicationsScreen() {
                   }}
                 />
                 <TouchableOpacity style={[styles.checkItem, { paddingVertical: 4 }]} onPress={() => setCaregiverConsent(!caregiverConsent)}>
-                  <View style={[styles.checkbox, caregiverConsent ? { backgroundColor: "#10b981" } : { borderColor: '#d1d5db' }]}>
+                  <View style={[styles.checkbox, caregiverConsent ? { backgroundColor: "#10b981" } : { borderColor: '#111827' }]}>
                     {caregiverConsent ? <Ionicons name="checkmark" size={16} color="#fff" /> : null}
                   </View>
                   <ThemedText style={[styles.checkLabel, { fontFamily: uiFontFamily, fontSize: 14, flex: 1 }]}>
                     I consent to sharing alerts with this caregiver.
                   </ThemedText>
                 </TouchableOpacity>
+
+            {(caregiverName || caregiverPhone || caregiverEmail) && (
+              <View style={styles.caregiverSummaryCard}>
+                <ThemedText style={[styles.caregiverLabel, { fontFamily: uiFontFamily }]}>Caregiver contact</ThemedText>
+                {caregiverName ? (
+                  <ThemedText style={[styles.caregiverValue, { fontFamily: uiFontFamily }]}>
+                    {caregiverName}
+                  </ThemedText>
+                ) : null}
+                {caregiverPhone ? (
+                  <ThemedText style={[styles.caregiverValue, { fontFamily: uiFontFamily }]}>
+                    {caregiverPhone}
+                  </ThemedText>
+                ) : null}
+                {caregiverEmail ? (
+                  <ThemedText style={[styles.caregiverValue, { fontFamily: uiFontFamily }]}>
+                    {caregiverEmail}
+                  </ThemedText>
+                ) : null}
+                <ThemedText style={[styles.escalationNote, { fontFamily: uiFontFamily }]}>
+                  Escalation: caregiver will be notified if you don’t confirm within 60 minutes.
+                </ThemedText>
+              </View>
+            )}
               </View>
             )}
           </View>
@@ -432,7 +562,7 @@ const styles = StyleSheet.create({
   checklistCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginTop: 6, marginHorizontal: 20 },
   checklistTitle: { marginBottom: 8 },
   checkItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  checkbox: { width: 30, height: 30, borderRadius: 6, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  checkbox: { width: 30, height: 30, borderRadius: 6, borderWidth: 2, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderColor: '#111827' },
   checkLabel: { fontSize: 16 },
   timeOptionsContainer: {
     flexDirection: 'row',
@@ -464,9 +594,30 @@ const styles = StyleSheet.create({
   footer: { padding: 20, borderTopWidth: 0 },
   saveButton: { padding: 16, borderRadius: 12, alignItems: 'center' },
   saveText: { fontSize: 18 },
-  // Badge that shows the selection order (1..3) when multiple times selected
-  // Circular badge that shows the selection order (1..3). Fixed 20x20 for round shape.
-  timeBadge: { position: 'absolute', bottom: 8, right: 8, backgroundColor: '#10b981', width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  timeBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700', lineHeight: 14 },
+  // Checkmark for selected time slots
+  selectedCheckmark: { position: 'absolute', bottom: 8, right: 8 },
+  caregiverSummaryCard: {
+    marginTop: 8,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#10b981',
+    gap: 2,
+  },
+  caregiverLabel: {
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  caregiverValue: {
+    fontSize: 14,
+    color: '#1f2937',
+  },
+  escalationNote: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#ef4444',
+  },
 
 });

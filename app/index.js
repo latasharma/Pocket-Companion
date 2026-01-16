@@ -11,6 +11,7 @@ import {
   View
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import BottomNav from '../components/BottomNav';
 
 export default function HomeScreen() {
   const [user, setUser] = useState(null);
@@ -59,12 +60,8 @@ export default function HomeScreen() {
     router.push('/chat');
   };
 
-  const handleOpenReminders = () => {
-    router.push('/Reminders/ShowReminderOptionsScreen');
-  };
-
-  const handleProfileSettings = () => {
-    router.push('/profile');
+  const handleOpenDashboard = () => {
+    router.push('/dashboard');
   };
 
   const handleSignOut = async () => {
@@ -138,34 +135,21 @@ export default function HomeScreen() {
             <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
           </TouchableOpacity>
 
-          {/* Inserted: Reminder option between the two existing options */}
-          <TouchableOpacity style={styles.optionCard} onPress={handleOpenReminders}>
+          <TouchableOpacity style={styles.optionCard} onPress={handleOpenDashboard}>
             <View style={styles.optionIcon}>
-              <Ionicons name="notifications-outline" size={32} color="#10b981" />
+              <Ionicons name="grid-outline" size={32} color="#10b981" />
             </View>
             <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Reminder</Text>
+              <Text style={styles.optionTitle}>Dashboard</Text>
               <Text style={styles.optionDescription}>
-                Manage medication, appointments, and important dates
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.optionCard} onPress={handleProfileSettings}>
-            <View style={styles.optionIcon}>
-              <Ionicons name="person-circle" size={32} color="#10b981" />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Profile & Settings</Text>
-              <Text style={styles.optionDescription}>
-                Manage your profile and app preferences
+                Quick view of medications, safety, and appointments
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
           </TouchableOpacity>
         </View>
       </View>
+      <BottomNav />
     </SafeAreaView>
   );
 }
@@ -203,7 +187,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 110,
   },
   avatarSection: {
     alignItems: 'center',

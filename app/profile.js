@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import VoiceSelector from '../components/VoiceSelector';
+import BottomNav from '../components/BottomNav';
 import { supabase } from '../lib/supabase';
 import { VoiceService } from '../lib/voiceService';
 
@@ -23,6 +24,12 @@ export default function ProfileScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [companionName, setCompanionName] = useState('');
+  const [caregiverName, setCaregiverName] = useState('');
+  const [caregiverPhone, setCaregiverPhone] = useState('');
+  const [caregiverEmail, setCaregiverEmail] = useState('');
+  const [caregiverOrgName, setCaregiverOrgName] = useState('');
+  const [caregiverOrgPhone, setCaregiverOrgPhone] = useState('');
+  const [caregiverOrgEmail, setCaregiverOrgEmail] = useState('');
   const [loading, setLoading] = useState(false);
   
   const [dataCollection, setDataCollection] = useState(true);
@@ -58,6 +65,12 @@ export default function ProfileScreen() {
         setFirstName(data.first_name || '');
         setLastName(data.last_name || '');
           setCompanionName(data.companion_name || 'Pixel');
+          setCaregiverName(data.caregiver_name || '');
+          setCaregiverPhone(data.caregiver_phone || '');
+          setCaregiverEmail(data.caregiver_email || '');
+          setCaregiverOrgName(data.caregiver_org_name || '');
+          setCaregiverOrgPhone(data.caregiver_org_phone || '');
+          setCaregiverOrgEmail(data.caregiver_org_email || '');
           setVoiceEnabled(data.voice_enabled !== false); // Default to true if not set
           setVoiceInputEnabled(data.voice_input_enabled !== false); // Default to true if not set
           
@@ -78,6 +91,12 @@ export default function ProfileScreen() {
           setFirstName('');
           setLastName('');
           setCompanionName('Pixel');
+          setCaregiverName('');
+          setCaregiverPhone('');
+          setCaregiverEmail('');
+          setCaregiverOrgName('');
+          setCaregiverOrgPhone('');
+          setCaregiverOrgEmail('');
           setVoiceEnabled(true);
           setVoiceInputEnabled(true);
           
@@ -116,6 +135,12 @@ export default function ProfileScreen() {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           companion_name: companionName.trim(),
+          caregiver_name: caregiverName.trim() || null,
+          caregiver_phone: caregiverPhone.trim() || null,
+          caregiver_email: caregiverEmail.trim() || null,
+          caregiver_org_name: caregiverOrgName.trim() || null,
+          caregiver_org_phone: caregiverOrgPhone.trim() || null,
+          caregiver_org_email: caregiverOrgEmail.trim() || null,
           //voice_enabled: voiceEnabled,
         });
 
@@ -151,6 +176,82 @@ export default function ProfileScreen() {
             }
           },
         },
+      ]
+    );
+  };
+
+  const handleClearCaregiver = async () => {
+    Alert.alert(
+      'Remove caregiver',
+      'Remove caregiver contact from your profile?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const { data: { user: authUser } } = await supabase.auth.getUser();
+              if (!authUser) return;
+              await supabase
+                .from('profiles')
+                .upsert({
+                  id: authUser.id,
+                  caregiver_name: null,
+                  caregiver_phone: null,
+                  caregiver_email: null,
+                });
+              setCaregiverName('');
+              setCaregiverPhone('');
+              setCaregiverEmail('');
+              Alert.alert('Removed', 'Caregiver contact removed.');
+            } catch (err) {
+              console.error('Error removing caregiver:', err);
+              Alert.alert('Error', 'Failed to remove caregiver.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleClearSecondaryCaregiver = async () => {
+    Alert.alert(
+      'Remove secondary caregiver',
+      'Remove secondary/organization caregiver contact from your profile?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const { data: { user: authUser } } = await supabase.auth.getUser();
+              if (!authUser) return;
+              await supabase
+                .from('profiles')
+                .upsert({
+                  id: authUser.id,
+                  caregiver_org_name: null,
+                  caregiver_org_phone: null,
+                  caregiver_org_email: null,
+                });
+              setCaregiverOrgName('');
+              setCaregiverOrgPhone('');
+              setCaregiverOrgEmail('');
+              Alert.alert('Removed', 'Secondary caregiver contact removed.');
+            } catch (err) {
+              console.error('Error removing secondary caregiver:', err);
+              Alert.alert('Error', 'Failed to remove secondary caregiver.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
       ]
     );
   };
@@ -333,6 +434,43 @@ export default function ProfileScreen() {
                   />
                 </View>
 
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Caregiver Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={caregiverName}
+                    onChangeText={setCaregiverName}
+                    placeholder="Enter caregiver name"
+                    placeholderTextColor="#9ca3af"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Caregiver Phone</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={caregiverPhone}
+                    onChangeText={setCaregiverPhone}
+                    placeholder="Enter caregiver phone"
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="phone-pad"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Caregiver Email</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={caregiverEmail}
+                    onChangeText={setCaregiverEmail}
+                    placeholder="Enter caregiver email"
+                    placeholderTextColor="#9ca3af"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                </View>
+
+
                 <TouchableOpacity
                   style={[styles.saveButton, loading && styles.saveButtonDisabled]}
                   onPress={handleSaveProfile}
@@ -352,6 +490,57 @@ export default function ProfileScreen() {
                 <Text style={styles.companionText}>
                   Your AI Companion: <Text style={styles.companionName}>{companionName || 'Pixel'}</Text>
                 </Text>
+                <View style={styles.caregiverCard}>
+                  <View style={styles.caregiverHeader}>
+                    <Text style={styles.caregiverTitle}>Caregiver contact</Text>
+                    {caregiverName || caregiverPhone || caregiverEmail ? (
+                      <TouchableOpacity onPress={handleClearCaregiver} style={styles.caregiverAction}>
+                        <Ionicons name="trash" size={18} color="#ef4444" />
+                        <Text style={[styles.caregiverActionText, { color: '#ef4444' }]}>Remove</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.caregiverAction}>
+                        <Ionicons name="add" size={18} color="#10b981" />
+                        <Text style={styles.caregiverActionText}>Add</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {caregiverName || caregiverPhone || caregiverEmail ? (
+                    <>
+                      <Text style={styles.caregiverText}>{caregiverName || 'Not set'}</Text>
+                      <Text style={styles.caregiverText}>{caregiverPhone || 'Phone not set'}</Text>
+                      <Text style={styles.caregiverText}>{caregiverEmail || 'Email not set'}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.caregiverText}>No caregiver on file. Tap Add to set one.</Text>
+                  )}
+                </View>
+
+                <View style={styles.caregiverCard}>
+                  <View style={styles.caregiverHeader}>
+                    <Text style={styles.caregiverTitle}>Secondary / Org caregiver</Text>
+                    {caregiverOrgName || caregiverOrgPhone || caregiverOrgEmail ? (
+                      <TouchableOpacity onPress={handleClearSecondaryCaregiver} style={styles.caregiverAction}>
+                        <Ionicons name="trash" size={18} color="#ef4444" />
+                        <Text style={[styles.caregiverActionText, { color: '#ef4444' }]}>Remove</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.caregiverAction}>
+                        <Ionicons name="add" size={18} color="#10b981" />
+                        <Text style={styles.caregiverActionText}>Add</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {caregiverOrgName || caregiverOrgPhone || caregiverOrgEmail ? (
+                    <>
+                      <Text style={styles.caregiverText}>{caregiverOrgName || 'Not set'}</Text>
+                      <Text style={styles.caregiverText}>{caregiverOrgPhone || 'Phone not set'}</Text>
+                      <Text style={styles.caregiverText}>{caregiverOrgEmail || 'Email not set'}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.caregiverText}>No secondary caregiver on file. Tap Add to set one.</Text>
+                  )}
+                </View>
               </View>
             )}
           </View>
@@ -566,6 +755,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <BottomNav />
     </SafeAreaView>
   );
 }
@@ -579,7 +769,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: 20,
+    paddingBottom: 120,
   },
   header: {
     backgroundColor: '#ffffff',
@@ -672,6 +862,41 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   companionName: {
+    color: '#10b981',
+    fontWeight: '600',
+  },
+  caregiverCard: {
+    marginTop: 8,
+    backgroundColor: '#f0fdf4',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#10b981',
+    width: '100%',
+  },
+  caregiverHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  caregiverTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  caregiverText: {
+    fontSize: 14,
+    color: '#1f2937',
+    marginTop: 2,
+  },
+  caregiverAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  caregiverActionText: {
+    fontSize: 13,
     color: '#10b981',
     fontWeight: '600',
   },

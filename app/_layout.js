@@ -97,6 +97,8 @@ export default function RootLayout() {
       <Stack.Screen name="terms" />
       <Stack.Screen name="support" />
       <Stack.Screen name="about" />
+      <Stack.Screen name="dashboard" />
+      <Stack.Screen name="dashboard-details" />
       <Stack.Screen name="signin" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="chat" />
