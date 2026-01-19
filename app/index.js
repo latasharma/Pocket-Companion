@@ -60,10 +60,6 @@ export default function HomeScreen() {
     router.push('/chat');
   };
 
-  const handleOpenDashboard = () => {
-    router.push('/dashboard');
-  };
-
   const handleSignOut = async () => {
     Alert.alert(
       'Sign Out',
@@ -135,18 +131,7 @@ export default function HomeScreen() {
             <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionCard} onPress={handleOpenDashboard}>
-            <View style={styles.optionIcon}>
-              <Ionicons name="grid-outline" size={32} color="#10b981" />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Dashboard</Text>
-              <Text style={styles.optionDescription}>
-                Quick view of medications, safety, and appointments
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
-          </TouchableOpacity>
+          
         </View>
       </View>
       <BottomNav />

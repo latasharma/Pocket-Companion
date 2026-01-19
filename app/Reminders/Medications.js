@@ -366,19 +366,23 @@ export default function MedicationsScreen() {
     router.back();
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (item) => {
+    const medName = item?.name ? `"${item.name}"` : 'this medication';
     Alert.alert(
       'Delete Medication',
-      'Are you sure you want to delete this medication?',
+      `Are you sure you want to delete ${medName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const { error } = await supabase.from('medications').delete().eq('id', id);
-            if (!error) fetchMedications();
-            else Alert.alert('Error', 'Failed to delete medication');
+            const { error } = await supabase.from('medications').delete().eq('id', item.id);
+            if (error) {
+              Alert.alert('Error', 'Failed to delete medication');
+              return;
+            }
+            setMedications((prev) => prev.filter((med) => med.id !== item.id));
           },
         },
       ]
@@ -449,7 +453,7 @@ export default function MedicationsScreen() {
         <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton} accessibilityLabel="Edit">
           <Ionicons name="pencil" size={20} color="#3b82f6" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.iconButton} accessibilityLabel="Delete">
+        <TouchableOpacity onPress={() => handleDelete(item)} style={styles.iconButton} accessibilityLabel="Delete">
           <Ionicons name="trash" size={20} color="#ef4444" />
         </TouchableOpacity>
       </View>

@@ -3,6 +3,8 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -12,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import VoiceSelector from '../components/VoiceSelector';
 import BottomNav from '../components/BottomNav';
 import { supabase } from '../lib/supabase';
@@ -37,10 +40,181 @@ export default function ProfileScreen() {
   const [notifications, setNotifications] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voiceInputEnabled, setVoiceInputEnabled] = useState(true);
+  const [prefLoading, setPrefLoading] = useState(false);
+  const [proactiveFrequency, setProactiveFrequency] = useState('daily');
+  const [quietStart, setQuietStart] = useState('21:00');
+  const [quietEnd, setQuietEnd] = useState('08:00');
+  const [quietStartDate, setQuietStartDate] = useState(() => {
+    const d = new Date();
+    d.setHours(21, 0, 0, 0);
+    return d;
+  });
+  const [quietEndDate, setQuietEndDate] = useState(() => {
+    const d = new Date();
+    d.setHours(8, 0, 0, 0);
+    return d;
+  });
+  const [showQuietStartPicker, setShowQuietStartPicker] = useState(false);
+  const [showQuietEndPicker, setShowQuietEndPicker] = useState(false);
+  const [topicNews, setTopicNews] = useState(true);
+  const [topicGames, setTopicGames] = useState(true);
+  const [topicImportantDates, setTopicImportantDates] = useState(true);
+  const [newsKeywords, setNewsKeywords] = useState('');
+  const [newsRss, setNewsRss] = useState('');
 
   useEffect(() => {
     fetchUserProfile();
+    loadProactivePreferences();
   }, []);
+
+  const normalizeTimeInput = (value) => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (trimmed.length >= 5) return trimmed.slice(0, 5);
+    return trimmed;
+  };
+
+  const formatTime = (date) => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const timeStringToDate = (value, fallback) => {
+    if (!value) return fallback;
+    const [h, m] = value.split(':').map(Number);
+    const d = new Date();
+    d.setHours(Number.isFinite(h) ? h : fallback.getHours(), Number.isFinite(m) ? m : fallback.getMinutes(), 0, 0);
+    return d;
+  };
+
+  const loadProactivePreferences = async () => {
+    try {
+      const { data: { user: authUserData } } = await supabase.auth.getUser();
+      if (!authUserData) return;
+
+      const { data: prefData } = await supabase
+        .from('proactive_preferences')
+        .select('*')
+        .eq('user_id', authUserData.id)
+        .single();
+
+      if (prefData) {
+        setProactiveFrequency(prefData.frequency || 'daily');
+        const start = normalizeTimeInput(prefData.quiet_hours_start) || '21:00';
+        const end = normalizeTimeInput(prefData.quiet_hours_end) || '08:00';
+        setQuietStart(start);
+        setQuietEnd(end);
+        setQuietStartDate(timeStringToDate(start, quietStartDate));
+        setQuietEndDate(timeStringToDate(end, quietEndDate));
+      }
+
+      const { data: topics } = await supabase
+        .from('proactive_topics')
+        .select('topic_type, keywords, rss_sources')
+        .eq('user_id', authUserData.id);
+
+      if (topics && topics.length > 0) {
+        setTopicNews(!!topics.find((t) => t.topic_type === 'news'));
+        setTopicGames(!!topics.find((t) => t.topic_type === 'games'));
+        setTopicImportantDates(!!topics.find((t) => t.topic_type === 'important_dates'));
+
+        const newsTopic = topics.find((t) => t.topic_type === 'news');
+        if (newsTopic) {
+          setNewsKeywords((newsTopic.keywords || []).join(', '));
+          setNewsRss((newsTopic.rss_sources || []).join(', '));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading proactive preferences:', error);
+    }
+  };
+
+  const handleSaveProactivePreferences = async () => {
+    try {
+      setPrefLoading(true);
+      const { data: { user: authUserData } } = await supabase.auth.getUser();
+      if (!authUserData) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      let timezone = 'America/New_York';
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz) timezone = tz;
+      } catch (e) {
+        // keep default
+      }
+
+      const { error: prefError } = await supabase
+        .from('proactive_preferences')
+        .upsert({
+          user_id: authUserData.id,
+          channels: ['sms'],
+          quiet_hours_start: normalizeTimeInput(quietStart) || '21:00',
+          quiet_hours_end: normalizeTimeInput(quietEnd) || '08:00',
+          frequency: proactiveFrequency,
+          timezone,
+        }, { onConflict: 'user_id' });
+
+      if (prefError) {
+        console.error('Proactive preferences save error:', prefError);
+        Alert.alert('Error', prefError.message || 'Failed to save preferences');
+        return;
+      }
+
+      const { error: deleteError } = await supabase
+        .from('proactive_topics')
+        .delete()
+        .eq('user_id', authUserData.id);
+
+      if (deleteError) {
+        console.error('Proactive topics delete error:', deleteError);
+        Alert.alert('Error', deleteError.message || 'Failed to update topics');
+        return;
+      }
+
+      const topicsToInsert = [];
+
+      if (topicNews) {
+        const keywords = newsKeywords.split(',').map((k) => k.trim()).filter(Boolean);
+        const rssSources = newsRss.split(',').map((s) => s.trim()).filter(Boolean);
+        topicsToInsert.push({
+          user_id: authUserData.id,
+          topic_type: 'news',
+          keywords,
+          rss_sources: rssSources,
+        });
+      }
+
+      if (topicGames) {
+        topicsToInsert.push({ user_id: authUserData.id, topic_type: 'games' });
+      }
+
+      if (topicImportantDates) {
+        topicsToInsert.push({ user_id: authUserData.id, topic_type: 'important_dates' });
+      }
+
+      if (topicsToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from('proactive_topics')
+          .insert(topicsToInsert);
+        if (insertError) {
+          console.error('Proactive topics insert error:', insertError);
+          Alert.alert('Error', insertError.message || 'Failed to update topics');
+          return;
+        }
+      }
+
+      Alert.alert('Saved', 'Proactive preferences updated');
+    } catch (error) {
+      console.error('Error saving proactive preferences:', error);
+      Alert.alert('Error', 'Failed to save preferences');
+    } finally {
+      setPrefLoading(false);
+    }
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -571,6 +745,226 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Proactive Preferences</Text>
+          <View style={styles.settingsCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="calendar-clear" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Frequency</Text>
+                  <Text style={styles.settingDescription}>How often PoCo checks in</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.choiceRow}>
+              <TouchableOpacity
+                style={[styles.choiceButton, proactiveFrequency === 'daily' && styles.choiceButtonActive]}
+                onPress={() => setProactiveFrequency('daily')}
+              >
+                <Text style={[styles.choiceText, proactiveFrequency === 'daily' && styles.choiceTextActive]}>Daily</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.choiceButton, proactiveFrequency === 'weekly' && styles.choiceButtonActive]}
+                onPress={() => setProactiveFrequency('weekly')}
+              >
+                <Text style={[styles.choiceText, proactiveFrequency === 'weekly' && styles.choiceTextActive]}>Weekly</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="moon" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Quiet Hours</Text>
+                  <Text style={styles.settingDescription}>No SMS during these times</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.inlineInputs}>
+              <TouchableOpacity
+                style={[styles.input, styles.inlineInput, styles.timeInput]}
+                onPress={() => setShowQuietStartPicker(true)}
+              >
+                <Text style={styles.timeInputText}>{quietStart}</Text>
+              </TouchableOpacity>
+              <Text style={styles.inlineLabel}>to</Text>
+              <TouchableOpacity
+                style={[styles.input, styles.inlineInput, styles.timeInput]}
+                onPress={() => setShowQuietEndPicker(true)}
+              >
+                <Text style={styles.timeInputText}>{quietEnd}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {Platform.OS === 'android' && showQuietStartPicker && (
+              <DateTimePicker
+                value={quietStartDate}
+                mode="time"
+                display="default"
+                onChange={(_, selected) => {
+                  setShowQuietStartPicker(false);
+                  if (!selected) return;
+                  setQuietStartDate(selected);
+                  setQuietStart(formatTime(selected));
+                }}
+              />
+            )}
+
+            {Platform.OS === 'android' && showQuietEndPicker && (
+              <DateTimePicker
+                value={quietEndDate}
+                mode="time"
+                display="default"
+                onChange={(_, selected) => {
+                  setShowQuietEndPicker(false);
+                  if (!selected) return;
+                  setQuietEndDate(selected);
+                  setQuietEnd(formatTime(selected));
+                }}
+              />
+            )}
+
+            {Platform.OS === 'ios' && (
+              <>
+                <Modal
+                  visible={showQuietStartPicker}
+                  transparent
+                  animationType="slide"
+                  onRequestClose={() => setShowQuietStartPicker(false)}
+                >
+                  <View style={styles.pickerModalOverlay}>
+                    <View style={styles.pickerContainer}>
+                      <View style={styles.pickerHeader}>
+                        <TouchableOpacity onPress={() => setShowQuietStartPicker(false)}>
+                          <Text style={styles.pickerDoneText}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={quietStartDate}
+                        mode="time"
+                        display="spinner"
+                        onChange={(_, selected) => {
+                          if (!selected) return;
+                          setQuietStartDate(selected);
+                          setQuietStart(formatTime(selected));
+                        }}
+                      />
+                    </View>
+                  </View>
+                </Modal>
+
+                <Modal
+                  visible={showQuietEndPicker}
+                  transparent
+                  animationType="slide"
+                  onRequestClose={() => setShowQuietEndPicker(false)}
+                >
+                  <View style={styles.pickerModalOverlay}>
+                    <View style={styles.pickerContainer}>
+                      <View style={styles.pickerHeader}>
+                        <TouchableOpacity onPress={() => setShowQuietEndPicker(false)}>
+                          <Text style={styles.pickerDoneText}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={quietEndDate}
+                        mode="time"
+                        display="spinner"
+                        onChange={(_, selected) => {
+                          if (!selected) return;
+                          setQuietEndDate(selected);
+                          setQuietEnd(formatTime(selected));
+                        }}
+                      />
+                    </View>
+                  </View>
+                </Modal>
+              </>
+            )}
+
+            <View style={styles.divider} />
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="newspaper" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>News Updates</Text>
+                  <Text style={styles.settingDescription}>Headlines via SMS</Text>
+                </View>
+              </View>
+              <Switch
+                value={topicNews}
+                onValueChange={setTopicNews}
+                trackColor={{ false: '#d1d5db', true: '#10b981' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+            {topicNews ? (
+              <View style={styles.preferenceGroup}>
+                <Text style={styles.inputLabel}>Keywords (comma separated)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newsKeywords}
+                  onChangeText={setNewsKeywords}
+                  placeholder="health, tech, science"
+                  placeholderTextColor="#9ca3af"
+                />
+                <Text style={styles.inputLabel}>RSS Sources (comma separated)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newsRss}
+                  onChangeText={setNewsRss}
+                  placeholder="https://example.com/rss"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+            ) : null}
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="game-controller" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Games</Text>
+                  <Text style={styles.settingDescription}>Trivia, word, memory</Text>
+                </View>
+              </View>
+              <Switch
+                value={topicGames}
+                onValueChange={setTopicGames}
+                trackColor={{ false: '#d1d5db', true: '#10b981' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="gift" size={24} color="#10b981" />
+                <View style={styles.settingText}>
+                  <Text style={styles.settingTitle}>Important Dates</Text>
+                  <Text style={styles.settingDescription}>Birthdays & anniversaries</Text>
+                </View>
+              </View>
+              <Switch
+                value={topicImportantDates}
+                onValueChange={setTopicImportantDates}
+                trackColor={{ false: '#d1d5db', true: '#10b981' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.saveButton, prefLoading && styles.saveButtonDisabled]}
+              onPress={handleSaveProactivePreferences}
+              disabled={prefLoading}
+            >
+              <Text style={styles.saveButtonText}>{prefLoading ? 'Saving...' : 'Save Preferences'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Companion Settings</Text>
           <View style={styles.settingsCard}>
             <View style={styles.settingRow}>
@@ -935,6 +1329,74 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  choiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  choiceButton: {
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: '#f3f4f6',
+  },
+  choiceButtonActive: {
+    backgroundColor: '#10b981',
+  },
+  choiceText: {
+    color: '#374151',
+    fontWeight: '600',
+  },
+  choiceTextActive: {
+    color: '#fff',
+  },
+  inlineInputs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  inlineInput: {
+    flex: 1,
+  },
+  inlineLabel: {
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  timeInput: {
+    justifyContent: 'center',
+  },
+  timeInputText: {
+    fontSize: 16,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  pickerContainer: {
+    backgroundColor: '#fff',
+    paddingBottom: 20,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  pickerDoneText: {
+    color: '#10b981',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  preferenceGroup: {
+    marginBottom: 12,
   },
   settingItem: {
     flexDirection: 'row',

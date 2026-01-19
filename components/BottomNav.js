@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const navItems = [
   { key: 'home', label: 'Home', icon: 'home-outline', activeIcon: 'home', route: '/' },
@@ -15,9 +15,7 @@ export default function BottomNav() {
   return (
     <View style={styles.container}>
       {navItems.map((item) => {
-        const isActive =
-          pathname === item.route ||
-          (item.route === '/' && (pathname === '/dashboard' || pathname === '/dashboard-details'));
+        const isActive = pathname === item.route;
         const iconName = isActive ? item.activeIcon : item.icon;
         const color = isActive ? '#10b981' : '#6b7280';
 
@@ -29,7 +27,15 @@ export default function BottomNav() {
             accessibilityRole="button"
             accessibilityLabel={item.label}
           >
-            <Ionicons name={iconName} size={22} color={color} />
+            <Ionicons name={iconName} size={26} color={color} />
+            <Text
+              style={[styles.navLabel, { color }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {item.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -43,7 +49,7 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: 16,
-    height: 56,
+    height: 68,
     borderRadius: 16,
     backgroundColor: '#ffffff',
     flexDirection: 'row',
@@ -54,13 +60,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 8,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#e5e7eb',
   },
   navItem: {
-    width: 48,
-    height: 48,
+    width: 72,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  navLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
