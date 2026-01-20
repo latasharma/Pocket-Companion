@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -10,9 +10,9 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { parseMedicationFromOCR, performGeminiVisionOCRFromUrl } from '@/lib/aiService';
 import { supabase } from '@/lib/supabase';
+import { scheduleEmailConfirmation } from '../../lib/EmailConfirmationService';
 import { requestNotificationPermission, scheduleNotification } from '../../lib/NotificationService';
 import { scheduleSMSConfirmation } from '../../lib/SMSConfirmationService';
-import { Switch } from 'react-native';
 
 export default function MedicationsScreen() {
   const router = useRouter();
@@ -95,13 +95,13 @@ export default function MedicationsScreen() {
         }).then((doseEventId) => {
           const notificationId = `medication-${med.id}-${t}-${doseEventId || 'pending'}`;
           
-          // For critical medications, schedule SMS confirmation instead of notification with buttons
+          // For critical medications, schedule all confirmation methods
           if (med.is_critical && doseEventId) {
             // Schedule notification (reminder only, no action buttons needed)
             scheduleNotification({
               id: notificationId,
               title: 'Critical Medication Reminder',
-              body: `Time to take ${med.name}. You will receive an SMS to confirm.`,
+              body: `Time to take ${med.name}. You will receive SMS and email confirmations.`,
               date,
               type: 'medication_critical',
               data: {
@@ -119,6 +119,14 @@ export default function MedicationsScreen() {
               medicationName: med.name,
               scheduledAt: date
             }).catch(err => console.error('Error scheduling SMS:', err));
+
+            // Schedule Email confirmation to caregiver
+            scheduleEmailConfirmation({
+              doseEventId,
+              medicationName: med.name,
+              scheduledAt: date
+            }).catch(err => console.error('Error scheduling Email:', err));
+
           } else {
             // Regular medication: just notification reminder (no SMS, no escalation)
             scheduleNotification({
@@ -453,7 +461,7 @@ export default function MedicationsScreen() {
         <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton} accessibilityLabel="Edit">
           <Ionicons name="pencil" size={20} color="#3b82f6" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(item)} style={styles.iconButton} accessibilityLabel="Delete">
+        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.iconButton} accessibilityLabel="Delete">
           <Ionicons name="trash" size={20} color="#ef4444" />
         </TouchableOpacity>
       </View>
